@@ -117,13 +117,15 @@ public class PhoenixDataStoreFactory extends JDBCDataStoreFactory {
             return "jdbc:phoenix:127.0.0.1:/" + database;
     }
 
+    /**
+     * 设置访问数据库的参数配置
+     * @param parameters Map of {@link Param} objects.
+     */
     @Override
     protected void setupParameters(Map parameters) {
-        super.setupParameters(parameters);
         parameters.put(PORT.key, PORT);
         parameters.put(DBTYPE.key, DBTYPE);
         parameters.put(DATABASE.key, DATABASE);
         parameters.put(HOST.key, HOST);
-        /*添加自定义关键字*/
     }
 }

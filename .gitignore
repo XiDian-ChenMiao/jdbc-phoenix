@@ -57,3 +57,11 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+# Intellij IDE
+*.iml
+target/
+
+# Eclipse IDE
+*.classpath
+*.project

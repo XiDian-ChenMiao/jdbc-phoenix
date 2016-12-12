@@ -27,7 +27,7 @@ import java.util.Map;
 public class PhoenixDialectBasic extends BasicSQLDialect {
     PhoenixDialect delegate;
 
-    protected PhoenixDialectBasic(JDBCDataStore dataStore) {
+    public PhoenixDialectBasic(JDBCDataStore dataStore) {
         super(dataStore);
         this.delegate = new PhoenixDialect(dataStore);
     }

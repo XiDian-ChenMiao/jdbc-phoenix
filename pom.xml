@@ -72,20 +72,11 @@
             <scope>system</scope>
             <systemPath>${project.basedir}/lib/phoenix-4.4.0-HBase-0.98-client.jar</systemPath>
         </dependency>
-        <!--<dependency>-->
-            <!--<groupId>org.apache.phoenix</groupId>-->
-            <!--<artifactId>phoenix-core</artifactId>-->
-            <!--<version>4.8.1-HBase-1.2</version>-->
-        <!--</dependency>-->
-        <!--<dependency>-->
-            <!--<groupId>commons-dbcp</groupId>-->
-            <!--<artifactId>commons-dbcp</artifactId>-->
-            <!--<version>1.4</version>-->
-        <!--</dependency>-->
-        <!--<dependency>-->
-            <!--<groupId>org.opengeo</groupId>-->
-            <!--<artifactId>geodb</artifactId>-->
-            <!--<version>RELEASE</version>-->
-        <!--</dependency>-->
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-cql</artifactId>
+            <version>RELEASE</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
