@@ -1,10 +1,13 @@
 package org.geotools.data.phoenix;
 
+import org.geotools.data.Parameter;
 import org.geotools.jdbc.JDBCDataStore;
 import org.geotools.jdbc.JDBCDataStoreFactory;
 import org.geotools.jdbc.SQLDialect;
+import org.geotools.util.SimpleInternationalString;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -29,6 +32,18 @@ public class PhoenixDataStoreFactory extends JDBCDataStoreFactory {
      * 默认的数据库名称
      */
     public static final Param DATABASE = new Param("database", String.class, "Database", false );
+    /**
+     * 用户名
+     */
+    public static final Param USER = new Param("user", String.class, "user name to login as");
+    /**
+     * 密码
+     */
+    public static final Param PASSWD = new Param("passwd", String.class, new SimpleInternationalString("password used to login"), false, null, Collections.singletonMap(Parameter.IS_PASSWORD, Boolean.TRUE));
+    /**
+     * 暴露主键
+     */
+    public static final Param EXPOSE_PK = new Param("Expose primary keys", Boolean.class, "Expose primary key columns as attributes of the feature type", false, false);
 
     @Override
     public String getDisplayName() {

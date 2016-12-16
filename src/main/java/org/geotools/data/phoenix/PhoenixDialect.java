@@ -1,6 +1,10 @@
 package org.geotools.data.phoenix;
 
 import com.vividsolutions.jts.geom.*;
+import com.vividsolutions.jts.io.ParseException;
+import com.vividsolutions.jts.io.WKBReader;
+import com.vividsolutions.jts.io.WKBWriter;
+import org.geotools.factory.Hints;
 import org.geotools.geometry.jts.Geometries;
 import org.geotools.jdbc.JDBCDataStore;
 import org.geotools.jdbc.SQLDialect;
@@ -25,15 +29,33 @@ public class PhoenixDialect extends SQLDialect {
     /**
      * Phoenix的空间类型
      */
-    protected Integer POINT = new Integer(2001);
-    protected Integer GEOMETRY = new Integer(2007);
+    protected Integer POINT = new Integer(1);
+    protected Integer MULTIPOINT = new Integer(2);
+    protected Integer LINESTRING = new Integer(3);
+    protected Integer MULTILINESTRING = new Integer(4);
+    protected Integer POLYGON = new Integer(5);
+    protected Integer MULTIPOLYGON = new Integer(6);
+    protected Integer GEOMETRY = new Integer(7);
     /**
      * 创建索引的后缀名
      */
     private static String INDEX_SUFFIX = "_idx";
+    /**
+     * 设置是否一次插入多次读取标志
+     */
+    protected boolean isImmutableRows;
 
     protected PhoenixDialect(JDBCDataStore dataStore) {
         super(dataStore);
+        isImmutableRows = true;/*默认设置为只能一次插入多次读取*/
+    }
+
+    public void setImmutableRows(boolean immutableRows) {
+        isImmutableRows = immutableRows;
+    }
+
+    public boolean isImmutableRows() {
+        return isImmutableRows;
     }
 
     /**
@@ -55,9 +77,76 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public String getGeometryTypeName(Integer type) {
-        if (POINT.equals(type))
+        if (POINT.equals(type)) {
             return "POINT";
+        }
+
+        if (MULTIPOINT.equals(type)) {
+            return "MULTIPOINT";
+        }
+
+        if (LINESTRING.equals(type)) {
+            return "LINESTRING";
+        }
+
+        if (MULTILINESTRING.equals(type)) {
+            return "MULTILINESTRING";
+        }
+
+        if (POLYGON.equals(type)) {
+            return "POLYGON";
+        }
+
+        if (MULTIPOLYGON.equals(type)) {
+            return "MULTIPOLYGON";
+        }
+
+        if (GEOMETRY.equals(type)) {
+            return "GEOMETRY";
+        }
+
         return super.getGeometryTypeName(type);
+    }
+
+    /**
+     * 编码表名，如果此时已形成的SQL中带有插入关键字，则应该将通用的INSERT替换为UPSERT关键字
+     * @param raw
+     * @param sql
+     */
+    @Override
+    public void encodeTableName(String raw, StringBuffer sql) {
+        if (sql.toString().toUpperCase().indexOf("INSERT") >= 0) {
+            int startIndex = sql.toString().toUpperCase().indexOf("INSERT");
+            sql.replace(startIndex, startIndex + 6, "UPSERT");
+        }
+        super.encodeTableName(raw, sql);
+    }
+
+    /**
+     * 建表之后的表选项参数设置
+     * @param tableName
+     * @param sql
+     */
+    @Override
+    public void encodePostCreateTable(String tableName, StringBuffer sql) {
+        if (isImmutableRows) {
+            sql.append("IMMUTABLE_ROWS = true");
+        }
+    }
+
+    /**
+     * 将空间几何列信息利用WKB生成二进制流并拼接为SQL
+     * @param gatt
+     * @param prefix
+     * @param srid
+     * @param hints
+     * @param sql
+     */
+    @Override
+    public void encodeGeometryColumn(GeometryDescriptor gatt, String prefix, int srid, Hints hints, StringBuffer sql) {
+        sql.append("asWKB(");
+        encodeColumnName(prefix, gatt.getLocalName(), sql);
+        sql.append(")");
     }
 
     /**
@@ -73,7 +162,10 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public void encodeGeometryEnvelope(String tableName, String geometryColumn, StringBuffer sql) {
-
+        sql.append("asWKB(");
+        sql.append("envelope(");
+        encodeColumnName(null, geometryColumn, sql);
+        sql.append("))");
     }
 
     /**
@@ -96,45 +188,40 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public Envelope decodeGeometryEnvelope(ResultSet rs, int column, Connection cx) throws SQLException, IOException {
-        return null;
+        byte[] wkb = rs.getBytes(column);
+        try {
+            Polygon polygon = (Polygon) new WKBReader().read(wkb);
+
+            return polygon.getEnvelopeInternal();
+        } catch (ParseException e) {
+            String msg = "Error decoding wkb for envelope";
+            throw (IOException) new IOException(msg).initCause(e);
+        }
     }
 
     /**
-     * Decodes a geometry value from the result of a query.
-     * <p>
-     * This method is given direct access to a result set. The <tt>column</tt>
-     * parameter is the index into the result set which contains the geometric
-     * value.
-     * </p>
-     * <p>
-     * An implementation should deserialize the value provided by the result
-     * set into {@link Geometry} object. For example, consider an implementation
-     * which deserializes from well known text:
-     * <code>
-     * <pre>
-     *   String wkt = rs.getString( column );
-     *   if ( wkt == null ) {
-     *     return null;
-     *   }
-     *   return new WKTReader(factory).read( wkt );
-     *   </pre>
-     * </code>
-     * Note that implementations must handle <code>null</code> values.
-     * </p>
-     * <p>
-     * The <tt>factory</tt> parameter should be used to instantiate any geometry
-     * objects.
-     * </p>
-     *
+     * 将数据库空间列中取出的二进制流利用WKB读取成为一个空间对象
      * @param descriptor
      * @param rs
      * @param column
      * @param factory
      * @param cx
+     * @return
+     * @throws IOException
+     * @throws SQLException
      */
     @Override
     public Geometry decodeGeometryValue(GeometryDescriptor descriptor, ResultSet rs, String column, GeometryFactory factory, Connection cx) throws IOException, SQLException {
-        return null;
+        byte[] bytes = rs.getBytes(column);
+        if (bytes == null) {
+            return null;
+        }
+        try {
+            return new WKBReader(factory).read(bytes);
+        } catch (ParseException e) {
+            String msg = "Error decoding wkb";
+            throw (IOException) new IOException(msg).initCause(e);
+        }
     }
 
     @Override
@@ -196,6 +283,14 @@ public class PhoenixDialect extends SQLDialect {
         }
     }
 
+    /**
+     * 当创建表之后附带创建存放表中空间列信息的元数据表
+     * @param schemaName  The name of the schema, may be <code>null</code>.
+     * @param featureType The feature type that has just been created on the database.
+     * @param cx          Database connection.
+     * @throws SQLException
+     * @throws IOException
+     */
     @Override
     public void postCreateTable(String schemaName, SimpleFeatureType featureType, Connection cx) throws SQLException, IOException {
         super.postCreateTable(schemaName, featureType, cx);
@@ -287,25 +382,112 @@ public class PhoenixDialect extends SQLDialect {
         }
     }
 
+    /**
+     * 从元数据表中获取空间参考ID
+     * @param schemaName The database schema, could be <code>null</code>.
+     * @param tableName  The table, never <code>null</code>.
+     * @param columnName The column name, never <code>null</code>
+     * @param cx         The database connection.
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public Integer getGeometrySRID(String schemaName, String tableName, String columnName, Connection cx) throws SQLException {
+        /*形成的SQL:
+        select srid
+        from geometry_columns
+        where f_table_schema (IS NULL | = '模式名')
+        AND f_table_name = '表名' AND f_geometry_column = '列名'*/
+        /*在执行此方法之前，先需检查是否存在geometry_columns表*/
+        StringBuffer sql = new StringBuffer();
+        sql.append("SELECT ");
+        encodeColumnName(null, "srid", sql);
+        sql.append(" FROM ");
+        encodeTableName("geometry_columns", sql);
+        sql.append(" WHERE ");
+
+        encodeColumnName(null, "f_table_schema", sql);
+
+        if (schemaName != null) {
+            sql.append(" = '").append(schemaName).append("'");
+        } else {
+            sql.append(" IS NULL");
+        }
+        sql.append(" AND ");
+
+        encodeColumnName(null, "f_table_name", sql);
+        sql.append(" = '").append(tableName).append("' AND ");
+
+        encodeColumnName(null, "f_geometry_column", sql);
+        sql.append(" = '").append(columnName).append("'");
+
+        dataStore.getLogger().fine(sql.toString());
+
+        Statement st = cx.createStatement();
+        try {
+            ResultSet rs = st.executeQuery(sql.toString());
+            try {
+                if (rs.next()) {
+                    return new Integer(rs.getInt(1));
+                }
+            } finally {
+                dataStore.closeSafe(rs);
+            }
+        } catch (SQLException e) {
+            /*geometry_columns不存在时的处理方法*/
+        } finally {
+            dataStore.closeSafe(st);
+        }
+        return null;
+    }
+
+    /**
+     * 注册空间数据类型与数据库中类型数字字段的映射
+     * @param mappings
+     */
     @Override
     public void registerClassToSqlMappings(Map<Class<?>, Integer> mappings) {
         super.registerClassToSqlMappings(mappings);
         mappings.put(Point.class, POINT);
+        mappings.put(LineString.class, LINESTRING);
+        mappings.put(Polygon.class, POLYGON);
+        mappings.put(MultiPoint.class, MULTIPOINT);
+        mappings.put(MultiLineString.class, MULTILINESTRING);
+        mappings.put(MultiPolygon.class, MULTIPOLYGON);
         mappings.put(Geometry.class, GEOMETRY);
     }
 
+    /**
+     * 注册数据库中类型数字字段与空间数据类型的映射
+     * @param mappings
+     */
     @Override
     public void registerSqlTypeToClassMappings(Map<Integer, Class<?>> mappings) {
         super.registerSqlTypeToClassMappings(mappings);
         mappings.put(POINT, Point.class);
+        mappings.put(LINESTRING, LineString.class);
+        mappings.put(POLYGON, Polygon.class);
+        mappings.put(MULTIPOINT, MultiPoint.class);
+        mappings.put(MULTILINESTRING, MultiLineString.class);
+        mappings.put(MULTIPOLYGON, MultiPolygon.class);
         mappings.put(GEOMETRY, Geometry.class);
     }
 
+    /**
+     * 注册空间类型字面量与空间数据类型的映射
+     * @param mappings
+     */
     @Override
     public void registerSqlTypeNameToClassMappings(Map<String, Class<?>> mappings) {
         super.registerSqlTypeNameToClassMappings(mappings);
         mappings.put("POINT", Point.class);
+        mappings.put("LINESTRING", LineString.class);
+        mappings.put("POLYGON", Polygon.class);
+        mappings.put("MULTIPOINT", MultiPoint.class);
+        mappings.put("MULTILINESTRING", MultiLineString.class);
+        mappings.put("MULTIPOLYGON", MultiPolygon.class);
         mappings.put("GEOMETRY", Geometry.class);
+        mappings.put("GEOMETRYCOLLETION", GeometryCollection.class);
     }
 
     /**
@@ -328,7 +510,25 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public boolean isLimitOffsetSupported() {
-        return false;
+        return true;
+    }
+
+    /**
+     * 拼接分页SQL
+     * @param sql
+     * @param limit
+     * @param offset
+     */
+    @Override
+    public void applyLimitOffset(StringBuffer sql, int limit, int offset) {
+        if (limit >= 0 && limit < Integer.MAX_VALUE) {
+            if (offset > 0)
+                sql.append(" LIMIT " + limit + " OFFSET " + offset);
+            else
+                sql.append(" LIMIT " + limit + " OFFSET 0");
+        } else if (offset > 0) {
+            sql.append(" LIMIT " + Long.MAX_VALUE + " OFFSET " + offset);
+        }
     }
 
     /**

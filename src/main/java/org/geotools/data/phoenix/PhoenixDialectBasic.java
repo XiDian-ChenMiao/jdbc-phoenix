@@ -68,6 +68,11 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     }
 
     @Override
+    public void encodeTableName(String raw, StringBuffer sql) {
+        delegate.encodeTableName(raw, sql);
+    }
+
+    @Override
     public void postCreateTable(String schemaName, SimpleFeatureType featureType, Connection cx) throws SQLException, IOException {
         delegate.postCreateTable(schemaName, featureType, cx);
     }

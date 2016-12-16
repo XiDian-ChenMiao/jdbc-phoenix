@@ -76,7 +76,6 @@
             <groupId>org.geotools</groupId>
             <artifactId>gt-cql</artifactId>
             <version>RELEASE</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
