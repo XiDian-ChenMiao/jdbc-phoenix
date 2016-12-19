@@ -3,7 +3,6 @@ package org.geotools.data.phoenix;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKBReader;
-import com.vividsolutions.jts.io.WKBWriter;
 import org.geotools.factory.Hints;
 import org.geotools.geometry.jts.Geometries;
 import org.geotools.jdbc.JDBCDataStore;
@@ -18,6 +17,7 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import java.io.IOException;
 import java.sql.*;
 import java.util.Map;
+import java.util.UUID;
 import java.util.logging.Level;
 
 /**
@@ -29,13 +29,13 @@ public class PhoenixDialect extends SQLDialect {
     /**
      * Phoenix的空间类型
      */
-    protected Integer POINT = new Integer(1);
-    protected Integer MULTIPOINT = new Integer(2);
-    protected Integer LINESTRING = new Integer(3);
-    protected Integer MULTILINESTRING = new Integer(4);
-    protected Integer POLYGON = new Integer(5);
-    protected Integer MULTIPOLYGON = new Integer(6);
-    protected Integer GEOMETRY = new Integer(7);
+    protected Integer POINT = new Integer(2001);
+    protected Integer MULTIPOINT = new Integer(2002);
+    protected Integer LINESTRING = new Integer(2003);
+    protected Integer MULTILINESTRING = new Integer(2004);
+    protected Integer POLYGON = new Integer(2005);
+    protected Integer MULTIPOLYGON = new Integer(2006);
+    protected Integer GEOMETRY = new Integer(2007);
     /**
      * 创建索引的后缀名
      */
@@ -274,6 +274,12 @@ public class PhoenixDialect extends SQLDialect {
     @Override
     public void encodePostColumnCreateTable(AttributeDescriptor att, StringBuffer sql) {
         super.encodePostColumnCreateTable(att, sql);
+        /*将凡是空间类型修饰的属性统一处理为VARBINARY*/
+        if (att instanceof GeometryDescriptor) {
+            int lastBracketIndex = sql.lastIndexOf(" ");/*最后一个空格的位置*/
+            sql.setLength(lastBracketIndex + 1);
+            sql.append("VARBINARY");
+        }
         /*使几何列非空，目的在于其上建立索引*/
         if (att instanceof GeometryDescriptor && !att.isNillable()) {
             sql.append(" NOT NULL");
@@ -304,18 +310,20 @@ public class PhoenixDialect extends SQLDialect {
                     StringBuffer sql = new StringBuffer("CREATE TABLE ");
                     encodeTableName("geometry_columns", sql);
                     sql.append("(");
+                    encodeColumnName(null, "id", sql);
+                    sql.append(" VARCHAR(200) NOT NULL PRIMARY KEY, ");
                     encodeColumnName(null, "f_table_schema", sql);/*添加表模式列*/
-                    sql.append(" varchar(255), ");
+                    sql.append(" VARCHAR(255), ");
                     encodeColumnName(null, "f_table_name", sql);/*添加表名列*/
-                    sql.append(" varchar(255), ");
+                    sql.append(" VARCHAR(255), ");
                     encodeColumnName(null, "f_geometry_column", sql);/*添加几何名称列*/
-                    sql.append(" varchar(255), ");
+                    sql.append(" VARCHAR(255), ");
                     encodeColumnName(null, "coord_dimension", sql);/*添加坐标维度列*/
-                    sql.append(" int, ");
+                    sql.append(" INTEGER, ");
                     encodeColumnName(null, "srid", sql);/*添加空间参考ID列*/
-                    sql.append(" int, ");
+                    sql.append(" INTEGER, ");
                     encodeColumnName(null, "type", sql);/*添加该列对应的类型列*/
-                    sql.append(" varchar(32)");
+                    sql.append(" VARCHAR(32)");
                     sql.append(")");
                     if (LOGGER.isLoggable(Level.FINE)) {
                         LOGGER.fine(sql.toString());
@@ -364,7 +372,7 @@ public class PhoenixDialect extends SQLDialect {
             }
             StringBuffer sql = new StringBuffer("UPSERT INTO ");
             encodeTableName("geometry_columns", sql);
-            sql.append(" VALUES (");
+            sql.append(" VALUES (").append("'").append(UUID.randomUUID().toString().replace("-", "")).append("', ");
             sql.append(schemaName != null ? "'" + schemaName + "'" : "NULL").append(", ");
             sql.append("'").append(featureType.getTypeName()).append("', ");
             sql.append("'").append(attributeDescriptor.getLocalName()).append("', ");
@@ -491,12 +499,42 @@ public class PhoenixDialect extends SQLDialect {
     }
 
     /**
+     * 数据库类型数字值与名称映射的注册
+     * @param overrides
+     */
+    @Override
+    public void registerSqlTypeToSqlTypeNameOverrides(Map<Integer, String> overrides) {
+        super.registerSqlTypeToSqlTypeNameOverrides(overrides);
+        overrides.put(POINT, "POINT");
+        overrides.put(LINESTRING, "LINESTRING");
+        overrides.put(POLYGON, "POLYGON");
+        overrides.put(MULTIPOINT, "MULTIPOINT");
+        overrides.put(MULTILINESTRING, "MULTILINESTRING");
+        overrides.put(MULTIPOLYGON, "MULTIPOLYGON");
+        overrides.put(GEOMETRY, "GEOMETRY");
+
+        overrides.put(Types.INTEGER, "INTEGER");
+        overrides.put(Types.BIGINT, "BIGINT");
+        overrides.put(Types.DOUBLE, "DOUBLE");
+        overrides.put(Types.VARCHAR, "VARCHAR");
+        overrides.put(Types.BINARY, "BINARY");
+        overrides.put(Types.VARBINARY, "VARBINARY");
+        overrides.put(Types.CHAR, "CHAR");
+        overrides.put(Types.DATE, "DATE");
+        overrides.put(Types.TIME, "TIME");
+        overrides.put(Types.BOOLEAN, "BOOLEAN");
+        overrides.put(Types.FLOAT, "FLOAT");
+        overrides.put(Types.DECIMAL, "DECIMAL");
+        overrides.put(Types.TIMESTAMP, "TIMESTAMP");
+    }
+
+    /**
      * 判断类是否为正确几何图形绑定的类
      * @param binding
      * @return
      */
     boolean isConcreteGeometry( Class binding ) {
-        return Point.class.isAssignableFrom(binding);
+        return Geometry.class.isAssignableFrom(binding);
     }
 
     @Override

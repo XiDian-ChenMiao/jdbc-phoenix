@@ -1,5 +1,6 @@
 package com.geotools.data.phoenix;
 
+import com.vividsolutions.jts.geom.*;
 import org.geotools.data.*;
 import org.geotools.data.collection.ListFeatureCollection;
 import org.geotools.data.jdbc.FilterToSQL;
@@ -17,6 +18,7 @@ import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.feature.FeatureComparators;
 import org.geotools.feature.NameImpl;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
+import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.jdbc.*;
 import org.junit.Test;
 import org.opengis.feature.simple.SimpleFeature;
@@ -90,7 +92,7 @@ public class PhoenixDataStoreFactoryTest {
         PhoenixDataStoreFactory factory = new PhoenixDataStoreFactory();
         DataStore dataStore = factory.createDataStore(params);
         JDBCDataStore jdbcDataStore = (JDBCDataStore) dataStore;
-        SimpleFeatureSource simpleFeaturerSource = jdbcDataStore.getFeatureSource("GEONAME");
+        SimpleFeatureSource simpleFeaturerSource = jdbcDataStore.getFeatureSource("GEOTOOLS_CM");
 
         Transaction transaction = new DefaultTransaction();
         SimpleFeatureStore simpleFeatureStore = (SimpleFeatureStore) simpleFeaturerSource;
@@ -99,8 +101,12 @@ public class PhoenixDataStoreFactoryTest {
         SimpleFeatureType schema = simpleFeatureStore.getSchema();/*获取表结构信息*/
         SimpleFeatureBuilder builder = new SimpleFeatureBuilder(schema);/*获取要素构建器*/
         List<SimpleFeature> infos = new ArrayList<>();
-        infos.add(builder.buildFeature(null, new Object[]{UUID.randomUUID().toString(), "岐山", 117.25, 13.35, 22.35, 1.1, 1.1, 1.1, 1.1, 2, 11, 11, 11}));
-        infos.add(builder.buildFeature(null, new Object[]{UUID.randomUUID().toString(), "宝鸡", 117.24, 13.36, 22.36, 1.2, 1.2, 1.2, 1.2, 2, 11, 11, 11}));
+
+        GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
+
+        infos.add(builder.buildFeature(null, new Object[]{1, geometryFactory.createPoint(new Coordinate(1, 1)), 1, "1"}));
+        infos.add(builder.buildFeature(null, new Object[]{2, geometryFactory.createPoint(new Coordinate(2, 2)), 2, "2"}));
+
         SimpleFeatureCollection collection = new ListFeatureCollection(schema, infos);
 
         simpleFeatureStore.setTransaction(transaction);
@@ -117,37 +123,20 @@ public class PhoenixDataStoreFactoryTest {
     }
 
     @Test
-    public void testBasicDialect() throws Exception {
-        PhoenixDataStoreFactory factory = new PhoenixDataStoreFactory();
-        DataStore dataStore = factory.createDataStore(params);
-        JDBCDataStore jdbcDataStore = (JDBCDataStore) dataStore;
-        PhoenixDialectBasic dialectBasic = (PhoenixDialectBasic) jdbcDataStore.getSQLDialect();
-    }
-
-    @Test
     public void testQueryByPK() throws IOException {
         PhoenixDataStoreFactory factory = new PhoenixDataStoreFactory();
         if (factory.canProcess(params)) {
             DataStore dataStore = factory.createDataStore(params);
             JDBCDataStore jdbcDataStore = (JDBCDataStore) dataStore;
             if (dataStore != null) {
-                SimpleFeatureSource simpleFeaturerSource = jdbcDataStore.getFeatureSource("GEONAME");
                 FilterFactory filterFactory = CommonFactoryFinder.getFilterFactory();
                 if (filterFactory != null) {
                     Set<FeatureId> selection = new HashSet<>();
-                    selection.add(filterFactory.featureId("0009a3f8373548f79aab62922e601cbf"));
-                    selection.add(filterFactory.featureId("000d2361ee414190b4fe1b4adfcd4c14"));
+                    selection.add(filterFactory.featureId("1"));
+                    selection.add(filterFactory.featureId("2"));
                     Filter filter = filterFactory.id(selection);
 
-                    SimpleFeatureCollection features = simpleFeaturerSource.getFeatures(filter);
-                    System.out.println("Found : " + features.size() + " feature");
-                    SimpleFeatureIterator iterator = features.features();
-                    while (iterator.hasNext()) {
-                        SimpleFeature feature = iterator.next();
-                        System.out.println(feature.getID());
-                    }
-
-                    Query query = new Query("GEONAME", filter);
+                    Query query = new Query("GEOTOOLS_CM", filter);
                     System.out.println(query.toString());
                     FeatureReader<SimpleFeatureType, SimpleFeature> reader = jdbcDataStore.getFeatureReader(query, Transaction.AUTO_COMMIT);
 
@@ -168,17 +157,16 @@ public class PhoenixDataStoreFactoryTest {
     @Test
     public void testQueryByProperty() throws Exception {
         JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
-        SimpleFeatureType type = jdbcDataStore.getSchema("GEONAME");
+        SimpleFeatureType type = jdbcDataStore.getSchema("GEOTOOLS_CM");
         FilterFactory filterFactory = CommonFactoryFinder.getFilterFactory(null);
-        Expression literal = filterFactory.literal("恰嘎尔藏布");
-        Expression prop = filterFactory.property("NAME");
+        Expression literal = filterFactory.literal(1);
+        Expression prop = filterFactory.property("INTPROPERRTY");
         PropertyIsEqualTo filter= filterFactory.equals(prop, literal);
         StringWriter buffer = new StringWriter();
         FilterToSQL filterToSQL = new FilterToSQL(buffer);
         filterToSQL.setFeatureType(type);
         filterToSQL.encode(filter);
-        System.out.println("查询SQL为：" + buffer.getBuffer().toString());
-        Query query = new Query("GEONAME", filter);
+        Query query = new Query("GEOTOOLS_CM", filter);
         FeatureReader<SimpleFeatureType, SimpleFeature> reader = jdbcDataStore.getFeatureReader(query, Transaction.AUTO_COMMIT);
         if (reader != null) {
             while (reader.hasNext()) {
@@ -189,5 +177,30 @@ public class PhoenixDataStoreFactoryTest {
                 System.out.println("\n");
             }
         }
+    }
+
+    /**
+     * 建表测试
+     * @throws IOException
+     */
+    public void testCreateTable() throws IOException {
+        SimpleFeatureTypeBuilder typeBuilder = new SimpleFeatureTypeBuilder();
+        typeBuilder.add("geometry", Point.class, 4326);
+        typeBuilder.add("intProperty", Integer.class);
+        typeBuilder.add("stringProperty", String.class);
+        typeBuilder.setName("GEOTOOLS_CM");
+
+        SimpleFeatureType simpleFeatureType = typeBuilder.buildFeatureType();
+        JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
+        jdbcDataStore.createSchema(simpleFeatureType);
+    }
+
+    /**
+     * 主函数
+     * @param args
+     */
+    public static void main(String[] args) throws IOException {
+        PhoenixDataStoreFactoryTest test = new PhoenixDataStoreFactoryTest();
+        test.testCreateTable();
     }
 }
