@@ -16,6 +16,7 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.io.IOException;
 import java.sql.*;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -29,13 +30,29 @@ public class PhoenixDialect extends SQLDialect {
     /**
      * Phoenix的空间类型
      */
-    protected Integer POINT = new Integer(2001);
-    protected Integer MULTIPOINT = new Integer(2002);
-    protected Integer LINESTRING = new Integer(2003);
-    protected Integer MULTILINESTRING = new Integer(2004);
-    protected Integer POLYGON = new Integer(2005);
-    protected Integer MULTIPOLYGON = new Integer(2006);
-    protected Integer GEOMETRY = new Integer(2007);
+    protected Integer POINT = new Integer(3001);
+    protected Integer MULTIPOINT = new Integer(3002);
+    protected Integer LINESTRING = new Integer(3003);
+    protected Integer MULTILINESTRING = new Integer(3004);
+    protected Integer POLYGON = new Integer(3005);
+    protected Integer MULTIPOLYGON = new Integer(3006);
+    protected Integer GEOMETRY = new Integer(3007);
+
+    /**
+     * 几何类型名称与类型的映射
+     */
+    protected final static Map<String, Class> TYPE_TO_CLASS_MAP = new HashMap<String, Class>() {
+        {
+            put("POINT", Point.class);
+            put("LINESTRING", LineString.class);
+            put("POLYGON", Polygon.class);
+            put("MULTIPOINT", MultiPoint.class);
+            put("MULTILINESTRING", MultiLineString.class);
+            put("MULTIPOLYGON", MultiPolygon.class);
+            put("GEOMETRY", Geometry.class);
+            put("GEOMETRYCOLLETION", GeometryCollection.class);
+        }
+    };
     /**
      * 创建索引的后缀名
      */
@@ -135,12 +152,34 @@ public class PhoenixDialect extends SQLDialect {
     }
 
     /**
-     * 将空间几何列信息利用WKB生成二进制流并拼接为SQL
-     * @param gatt
-     * @param prefix
-     * @param srid
-     * @param hints
-     * @param sql
+     * Encodes the name of a geometry column in a SELECT statement.
+     * <p>
+     * This method should wrap the column name in any functions that are used to
+     * retrieve its value. For instance, often it is necessary to use the function
+     * <code>asText</code>, or <code>asWKB</code> when fetching a geometry.
+     * </p>
+     * <p>
+     * This method must also be sure to properly encode the name of the column with
+     * the {@link #encodeColumnName(String, String, StringBuffer)} function.
+     * </p>
+     * <p>
+     * Example:
+     * </p>
+     * <p>
+     * <pre>
+     *   <code>
+     *   sql.append( "asText(" );
+     *   column( gatt.getLocalName(), sql );
+     *   sql.append( ")" );
+     *   </code>
+     * </pre>
+     * <p>
+     * </p>
+     * <p>
+     * This default implementation calls the deprecated
+     * {@link #encodeGeometryColumn(GeometryDescriptor, String, int, StringBuffer)} version of
+     * this method for backward compatibility reasons.
+     * </p>
      */
     @Override
     public void encodeGeometryColumn(GeometryDescriptor gatt, String prefix, int srid, Hints hints, StringBuffer sql) {
@@ -245,9 +284,56 @@ public class PhoenixDialect extends SQLDialect {
         return super.includeTable(schemaName, tableName, cx);
     }
 
+    /**
+     * 获取映射对象
+     * @param columnMetaData
+     * @param cx
+     * @return
+     * @throws SQLException
+     */
     @Override
     public Class<?> getMapping(ResultSet columnMetaData, Connection cx) throws SQLException {
+        String typeName = columnMetaData.getString("TYPE_NAME");
+        if (typeName != null && "VARBINARY".equalsIgnoreCase(typeName)) {
+            String gType = lookupGeometryType(columnMetaData, cx, "geometry_columns", "f_geometry_column");
+            if (gType != null && TYPE_TO_CLASS_MAP.containsKey(gType))
+                return TYPE_TO_CLASS_MAP.get(gType);
+        }
         return super.getMapping(columnMetaData, cx);
+    }
+
+    /**
+     * 从元数据表中获取指定空间列对应的列类型
+     * @param columnMetaData
+     * @param cx
+     * @param gTableName
+     * @param gColumnName
+     * @return
+     */
+    private String lookupGeometryType(ResultSet columnMetaData, Connection cx, String gTableName, String gColumnName) throws SQLException {
+        String tableName = columnMetaData.getString("TABLE_NAME");
+        String columnName = columnMetaData.getString("COLUMN_NAME");
+        String schemaName = columnMetaData.getString("TABLE_SCHEM");
+        Statement statement = null;
+        ResultSet result = null;
+        try {
+            StringBuffer sql = new StringBuffer();
+            sql.append("SELECT type FROM ").append(gTableName.toUpperCase()).append(" WHERE 1 = 1 ");
+            if (schemaName != null && !"".equals(schemaName))
+                sql.append("AND f_table_schema = '").append(schemaName.toUpperCase()).append("' ");
+            sql.append("AND f_table_name = '").append(tableName.toUpperCase()).append("' ");
+            sql.append("AND ").append(gColumnName).append(" = '").append(columnName.toUpperCase()).append("'");
+            LOGGER.log(Level.FINE, "Geometry type check; {0}", sql);
+            statement = cx.createStatement();
+            result = statement.executeQuery(sql.toString());
+            if (result.next()) {
+                return result.getString(1);
+            }
+        } finally {
+            dataStore.closeSafe(result);
+            dataStore.closeSafe(statement);
+        }
+        return null;
     }
 
     /**
@@ -373,9 +459,9 @@ public class PhoenixDialect extends SQLDialect {
             StringBuffer sql = new StringBuffer("UPSERT INTO ");
             encodeTableName("geometry_columns", sql);
             sql.append(" VALUES (").append("'").append(UUID.randomUUID().toString().replace("-", "")).append("', ");
-            sql.append(schemaName != null ? "'" + schemaName + "'" : "NULL").append(", ");
-            sql.append("'").append(featureType.getTypeName()).append("', ");
-            sql.append("'").append(attributeDescriptor.getLocalName()).append("', ");
+            sql.append(schemaName != null ? "'" + schemaName.toUpperCase() + "'" : "NULL").append(", ");
+            sql.append("'").append(featureType.getTypeName().toUpperCase()).append("', ");
+            sql.append("'").append(attributeDescriptor.getLocalName().toUpperCase()).append("', ");
             sql.append("2, ");
             sql.append(srid).append(", ");
             Geometries g = Geometries.getForBinding((Class<? extends Geometry>) gd.getType().getBinding());

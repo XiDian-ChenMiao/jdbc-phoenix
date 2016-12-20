@@ -5,6 +5,7 @@ import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKBReader;
+import com.vividsolutions.jts.io.WKBWriter;
 import org.geotools.data.jdbc.FilterToSQL;
 import org.geotools.jdbc.BasicSQLDialect;
 import org.geotools.jdbc.JDBCDataStore;
@@ -63,6 +64,11 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     }
 
     @Override
+    public void registerSqlTypeNameToClassMappings(Map<String, Class<?>> mappings) {
+        delegate.registerSqlTypeNameToClassMappings(mappings);
+    }
+
+    @Override
     public void encodePostCreateTable(String tableName, StringBuffer sql) {
         delegate.encodePostCreateTable(tableName, sql);
     }
@@ -75,6 +81,11 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     @Override
     public void postCreateTable(String schemaName, SimpleFeatureType featureType, Connection cx) throws SQLException, IOException {
         delegate.postCreateTable(schemaName, featureType, cx);
+    }
+
+    @Override
+    public Class<?> getMapping(ResultSet columnMetaData, Connection cx) throws SQLException {
+        return delegate.getMapping(columnMetaData, cx);
     }
 
     @Override
@@ -158,7 +169,7 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     }
 
     /**
-     * 编码几何图形值的时候调用
+     * 利用WKB将几何对象存储为数据库中的VARBINARY
      * @param value
      * @param dimension
      * @param srid
@@ -168,14 +179,14 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     @Override
     public void encodeGeometryValue(Geometry value, int dimension, int srid, StringBuffer sql) throws IOException {
         if (value != null && !value.isEmpty()) {
-
+            sql.append("'").append(new String(new WKBWriter().write(value))).append("'");
         } else {
             sql.append("NULL");
         }
     }
 
     /**
-     * 解码几何图形值的时候调用
+     * 将数据库中存储的几何对象的二进制数据读取为集合对象时调用
      * @param descriptor
      * @param rs
      * @param column

@@ -51,7 +51,6 @@ public class PhoenixDataStoreFactoryTest {
         params.put(PhoenixDataStoreFactory.PORT.key, 2181);
         params.put(PhoenixDataStoreFactory.USER.key, "root");
         params.put(PhoenixDataStoreFactory.PASSWD.key, "root");
-        params.put(PhoenixDataStoreFactory.EXPOSE_PK.key, true);
     }
 
     @Test
@@ -104,12 +103,11 @@ public class PhoenixDataStoreFactoryTest {
 
         GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
-        infos.add(builder.buildFeature(null, new Object[]{1, geometryFactory.createPoint(new Coordinate(1, 1)), 1, "1"}));
-        infos.add(builder.buildFeature(null, new Object[]{2, geometryFactory.createPoint(new Coordinate(2, 2)), 2, "2"}));
+        infos.add(builder.buildFeature("1", new Object[]{geometryFactory.createPoint(new Coordinate(1, 1)), 1, "1"}));
+        infos.add(builder.buildFeature("2", new Object[]{geometryFactory.createPoint(new Coordinate(2, 2)), 2, "2"}));
 
         SimpleFeatureCollection collection = new ListFeatureCollection(schema, infos);
 
-        simpleFeatureStore.setTransaction(transaction);
         try {
             simpleFeatureStore.addFeatures(collection);
             transaction.commit();
@@ -179,10 +177,7 @@ public class PhoenixDataStoreFactoryTest {
         }
     }
 
-    /**
-     * 建表测试
-     * @throws IOException
-     */
+    @Test
     public void testCreateTable() throws IOException {
         SimpleFeatureTypeBuilder typeBuilder = new SimpleFeatureTypeBuilder();
         typeBuilder.add("geometry", Point.class, 4326);
@@ -193,14 +188,5 @@ public class PhoenixDataStoreFactoryTest {
         SimpleFeatureType simpleFeatureType = typeBuilder.buildFeatureType();
         JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
         jdbcDataStore.createSchema(simpleFeatureType);
-    }
-
-    /**
-     * 主函数
-     * @param args
-     */
-    public static void main(String[] args) throws IOException {
-        PhoenixDataStoreFactoryTest test = new PhoenixDataStoreFactoryTest();
-        test.testCreateTable();
     }
 }
