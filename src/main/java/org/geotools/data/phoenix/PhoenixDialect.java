@@ -30,13 +30,13 @@ public class PhoenixDialect extends SQLDialect {
     /**
      * Phoenix的空间类型
      */
-    protected Integer POINT = new Integer(3001);
-    protected Integer MULTIPOINT = new Integer(3002);
-    protected Integer LINESTRING = new Integer(3003);
-    protected Integer MULTILINESTRING = new Integer(3004);
-    protected Integer POLYGON = new Integer(3005);
-    protected Integer MULTIPOLYGON = new Integer(3006);
-    protected Integer GEOMETRY = new Integer(3007);
+    protected final static Integer POINT = new Integer(3001);
+    protected final static Integer MULTIPOINT = new Integer(3002);
+    protected final static Integer LINESTRING = new Integer(3003);
+    protected final static Integer MULTILINESTRING = new Integer(3004);
+    protected final static Integer POLYGON = new Integer(3005);
+    protected final static Integer MULTIPOLYGON = new Integer(3006);
+    protected final static Integer GEOMETRY = new Integer(3007);
 
     /**
      * 几何类型名称与类型的映射
@@ -51,6 +51,34 @@ public class PhoenixDialect extends SQLDialect {
             put("MULTIPOLYGON", MultiPolygon.class);
             put("GEOMETRY", Geometry.class);
             put("GEOMETRYCOLLETION", GeometryCollection.class);
+        }
+    };
+    /**
+     * 自定义类型值与类型名称的映射
+     */
+    protected final static Map<Integer, String> VALUE_TO_STRING_MAP = new HashMap<Integer, String>() {
+        {
+            put(POINT, "POINT");
+            put(LINESTRING, "LINESTRING");
+            put(POLYGON, "POLYGON");
+            put(MULTIPOINT, "MULTIPOINT");
+            put(MULTILINESTRING, "MULTILINESTRING");
+            put(MULTIPOLYGON, "MULTIPOLYGON");
+            put(GEOMETRY, "GEOMETRY");
+
+            put(Types.INTEGER, "INTEGER");
+            put(Types.BIGINT, "BIGINT");
+            put(Types.DOUBLE, "DOUBLE");
+            put(Types.VARCHAR, "VARCHAR");
+            put(Types.BINARY, "BINARY");
+            put(Types.VARBINARY, "VARBINARY");
+            put(Types.CHAR, "CHAR");
+            put(Types.DATE, "DATE");
+            put(Types.TIME, "TIME");
+            put(Types.BOOLEAN, "BOOLEAN");
+            put(Types.FLOAT, "FLOAT");
+            put(Types.DECIMAL, "DECIMAL");
+            put(Types.TIMESTAMP, "TIMESTAMP");
         }
     };
     /**
@@ -94,34 +122,8 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public String getGeometryTypeName(Integer type) {
-        if (POINT.equals(type)) {
-            return "POINT";
-        }
-
-        if (MULTIPOINT.equals(type)) {
-            return "MULTIPOINT";
-        }
-
-        if (LINESTRING.equals(type)) {
-            return "LINESTRING";
-        }
-
-        if (MULTILINESTRING.equals(type)) {
-            return "MULTILINESTRING";
-        }
-
-        if (POLYGON.equals(type)) {
-            return "POLYGON";
-        }
-
-        if (MULTIPOLYGON.equals(type)) {
-            return "MULTIPOLYGON";
-        }
-
-        if (GEOMETRY.equals(type)) {
-            return "GEOMETRY";
-        }
-
+        if (VALUE_TO_STRING_MAP.containsKey(type))
+            return VALUE_TO_STRING_MAP.get(type);
         return super.getGeometryTypeName(type);
     }
 
@@ -183,9 +185,7 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public void encodeGeometryColumn(GeometryDescriptor gatt, String prefix, int srid, Hints hints, StringBuffer sql) {
-        sql.append("asWKB(");
         encodeColumnName(prefix, gatt.getLocalName(), sql);
-        sql.append(")");
     }
 
     /**
@@ -201,10 +201,7 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public void encodeGeometryEnvelope(String tableName, String geometryColumn, StringBuffer sql) {
-        sql.append("asWKB(");
-        sql.append("envelope(");
         encodeColumnName(null, geometryColumn, sql);
-        sql.append("))");
     }
 
     /**
@@ -344,7 +341,7 @@ public class PhoenixDialect extends SQLDialect {
     @Override
     public void encodePrimaryKey(String column, StringBuffer sql) {
         encodeColumnName(null, column, sql);
-        sql.append(" INTEGER PRIMARY KEY ASC");
+        sql.append(" INTEGER PRIMARY KEY DESC");
     }
 
     @Override
@@ -487,12 +484,6 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public Integer getGeometrySRID(String schemaName, String tableName, String columnName, Connection cx) throws SQLException {
-        /*形成的SQL:
-        select srid
-        from geometry_columns
-        where f_table_schema (IS NULL | = '模式名')
-        AND f_table_name = '表名' AND f_geometry_column = '列名'*/
-        /*在执行此方法之前，先需检查是否存在geometry_columns表*/
         StringBuffer sql = new StringBuffer();
         sql.append("SELECT ");
         encodeColumnName(null, "srid", sql);
@@ -533,6 +524,59 @@ public class PhoenixDialect extends SQLDialect {
             dataStore.closeSafe(st);
         }
         return null;
+    }
+
+    /**
+     * 获取维度
+     * @param schemaName The database schema, could be <code>null</code>.
+     * @param tableName  The table, never <code>null</code>.
+     * @param columnName The column name, never <code>null</code>
+     * @param cx         The database connection.
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public int getGeometryDimension(String schemaName, String tableName, String columnName, Connection cx) throws SQLException {
+        StringBuffer sql = new StringBuffer();
+        sql.append("SELECT ");
+        encodeColumnName(null, "coord_dimension", sql);
+        sql.append(" FROM ");
+        encodeTableName("geometry_columns", sql);
+        sql.append(" WHERE ");
+
+        encodeColumnName(null, "f_table_schema", sql);
+
+        if (schemaName != null) {
+            sql.append(" = '").append(schemaName).append("'");
+        } else {
+            sql.append(" IS NULL");
+        }
+        sql.append(" AND ");
+
+        encodeColumnName(null, "f_table_name", sql);
+        sql.append(" = '").append(tableName).append("' AND ");
+
+        encodeColumnName(null, "f_geometry_column", sql);
+        sql.append(" = '").append(columnName).append("'");
+
+        dataStore.getLogger().fine(sql.toString());
+
+        Statement st = cx.createStatement();
+        try {
+            ResultSet rs = st.executeQuery(sql.toString());
+            try {
+                if (rs.next()) {
+                    return new Integer(rs.getInt(1));
+                }
+            } finally {
+                dataStore.closeSafe(rs);
+            }
+        } catch (SQLException e) {
+            /*geometry_columns不存在时的处理方法*/
+        } finally {
+            dataStore.closeSafe(st);
+        }
+        return 2;
     }
 
     /**
@@ -591,27 +635,7 @@ public class PhoenixDialect extends SQLDialect {
     @Override
     public void registerSqlTypeToSqlTypeNameOverrides(Map<Integer, String> overrides) {
         super.registerSqlTypeToSqlTypeNameOverrides(overrides);
-        overrides.put(POINT, "POINT");
-        overrides.put(LINESTRING, "LINESTRING");
-        overrides.put(POLYGON, "POLYGON");
-        overrides.put(MULTIPOINT, "MULTIPOINT");
-        overrides.put(MULTILINESTRING, "MULTILINESTRING");
-        overrides.put(MULTIPOLYGON, "MULTIPOLYGON");
-        overrides.put(GEOMETRY, "GEOMETRY");
-
-        overrides.put(Types.INTEGER, "INTEGER");
-        overrides.put(Types.BIGINT, "BIGINT");
-        overrides.put(Types.DOUBLE, "DOUBLE");
-        overrides.put(Types.VARCHAR, "VARCHAR");
-        overrides.put(Types.BINARY, "BINARY");
-        overrides.put(Types.VARBINARY, "VARBINARY");
-        overrides.put(Types.CHAR, "CHAR");
-        overrides.put(Types.DATE, "DATE");
-        overrides.put(Types.TIME, "TIME");
-        overrides.put(Types.BOOLEAN, "BOOLEAN");
-        overrides.put(Types.FLOAT, "FLOAT");
-        overrides.put(Types.DECIMAL, "DECIMAL");
-        overrides.put(Types.TIMESTAMP, "TIMESTAMP");
+        overrides.putAll(VALUE_TO_STRING_MAP);
     }
 
     /**
@@ -634,6 +658,15 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public boolean isLimitOffsetSupported() {
+        return true;
+    }
+
+    /**
+     * 设置查询请求自动提交事务
+     * @return
+     */
+    @Override
+    public boolean isAutoCommitQuery() {
         return true;
     }
 

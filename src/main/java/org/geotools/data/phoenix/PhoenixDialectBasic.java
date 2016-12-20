@@ -109,6 +109,16 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     }
 
     @Override
+    public int getGeometryDimension(String schemaName, String tableName, String columnName, Connection cx) throws SQLException {
+        return delegate.getGeometryDimension(schemaName, tableName, columnName, cx);
+    }
+
+    @Override
+    public String getGeometryTypeName(Integer type) {
+        return delegate.getGeometryTypeName(type);
+    }
+
+    @Override
     public void encodePrimaryKey(String column, StringBuffer sql) {
         delegate.encodePrimaryKey(column, sql);
     }
@@ -227,5 +237,10 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     @Override
     public Envelope decodeGeometryEnvelope(ResultSet rs, int column, Connection cx) throws SQLException, IOException {
         return delegate.decodeGeometryEnvelope(rs, column, cx);
+    }
+
+    @Override
+    public boolean isAutoCommitQuery() {
+        return delegate.isAutoCommitQuery();
     }
 }

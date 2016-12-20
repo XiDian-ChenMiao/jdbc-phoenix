@@ -19,8 +19,11 @@ import org.geotools.feature.FeatureComparators;
 import org.geotools.feature.NameImpl;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
+import org.geotools.filter.text.cql2.CQL;
+import org.geotools.filter.text.cql2.CQLException;
 import org.geotools.jdbc.*;
 import org.junit.Test;
+import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.Name;
@@ -153,6 +156,33 @@ public class PhoenixDataStoreFactoryTest {
     }
 
     @Test
+    public void testSearch() throws IOException, CQLException {
+        DataStore dataStore = DataStoreFinder.getDataStore(params);
+        SimpleFeatureSource featureSource = dataStore.getFeatureSource("GEOTOOLS_CM");
+        Filter filter = CQL.toFilter("INTPROPERTY = 1");
+
+        SimpleFeatureCollection features = featureSource.getFeatures(filter);
+
+
+        System.out.println("Found:" + features.size() + " features.");
+        SimpleFeatureIterator iterator = features.features();
+        try {
+            while (iterator.hasNext()) {
+
+                SimpleFeature feature = iterator.next();
+                System.out.println(feature.getID());
+                for (Property property : feature.getProperties()) {
+                    System.out.println("\t" + property.getName() + " = " + property.getValue());
+                }
+                Geometry geometry = (Geometry) feature.getDefaultGeometry();
+                System.out.println(feature.getID() + " location " + geometry);
+            }
+        } catch (Exception e) {
+            iterator.close();
+        }
+    }
+
+    @Test
     public void testQueryByProperty() throws Exception {
         JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
         SimpleFeatureType type = jdbcDataStore.getSchema("GEOTOOLS_CM");
@@ -188,5 +218,10 @@ public class PhoenixDataStoreFactoryTest {
         SimpleFeatureType simpleFeatureType = typeBuilder.buildFeatureType();
         JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
         jdbcDataStore.createSchema(simpleFeatureType);
+    }
+
+    public static void main(String[] args) throws IOException, CQLException {
+        PhoenixDataStoreFactoryTest test = new PhoenixDataStoreFactoryTest();
+        test.testSearch();
     }
 }
