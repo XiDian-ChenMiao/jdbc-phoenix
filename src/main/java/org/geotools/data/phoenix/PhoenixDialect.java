@@ -3,6 +3,7 @@ package org.geotools.data.phoenix;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKBReader;
+import com.vividsolutions.jts.io.WKTReader;
 import org.geotools.factory.Hints;
 import org.geotools.geometry.jts.Geometries;
 import org.geotools.jdbc.JDBCDataStore;
@@ -224,9 +225,9 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public Envelope decodeGeometryEnvelope(ResultSet rs, int column, Connection cx) throws SQLException, IOException {
-        byte[] wkb = rs.getBytes(column);
+        String geoStr = rs.getString(column);
         try {
-            Polygon polygon = (Polygon) new WKBReader().read(wkb);
+            Polygon polygon = (Polygon) new WKTReader().read(geoStr);
 
             return polygon.getEnvelopeInternal();
         } catch (ParseException e) {
@@ -357,11 +358,11 @@ public class PhoenixDialect extends SQLDialect {
     @Override
     public void encodePostColumnCreateTable(AttributeDescriptor att, StringBuffer sql) {
         super.encodePostColumnCreateTable(att, sql);
-        /*将凡是空间类型修饰的属性统一处理为VARBINARY*/
+        /*将凡是空间类型修饰的属性统一处理为VARCHAR*/
         if (att instanceof GeometryDescriptor) {
             int lastBracketIndex = sql.lastIndexOf(" ");/*最后一个空格的位置*/
             sql.setLength(lastBracketIndex + 1);
-            sql.append("VARBINARY");
+            sql.append("VARCHAR(255)");
         }
         /*使几何列非空，目的在于其上建立索引*/
         if (att instanceof GeometryDescriptor && !att.isNillable()) {

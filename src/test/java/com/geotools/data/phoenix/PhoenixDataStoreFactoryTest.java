@@ -124,38 +124,6 @@ public class PhoenixDataStoreFactoryTest {
     }
 
     @Test
-    public void testQueryByPK() throws IOException {
-        PhoenixDataStoreFactory factory = new PhoenixDataStoreFactory();
-        if (factory.canProcess(params)) {
-            DataStore dataStore = factory.createDataStore(params);
-            JDBCDataStore jdbcDataStore = (JDBCDataStore) dataStore;
-            if (dataStore != null) {
-                FilterFactory filterFactory = CommonFactoryFinder.getFilterFactory();
-                if (filterFactory != null) {
-                    Set<FeatureId> selection = new HashSet<>();
-                    selection.add(filterFactory.featureId("1"));
-                    selection.add(filterFactory.featureId("2"));
-                    Filter filter = filterFactory.id(selection);
-
-                    Query query = new Query("GEOTOOLS_CM", filter);
-                    System.out.println(query.toString());
-                    FeatureReader<SimpleFeatureType, SimpleFeature> reader = jdbcDataStore.getFeatureReader(query, Transaction.AUTO_COMMIT);
-
-                    if (reader != null) {
-                        while (reader.hasNext()) {
-                            SimpleFeature feature = reader.next();
-                            List<Object> attributes = feature.getAttributes();
-                            for (Object obj : attributes)
-                                System.out.print(obj.toString() + "\t");
-                            System.out.println("\n");
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    @Test
     public void testSearch() throws IOException, CQLException {
         DataStore dataStore = DataStoreFinder.getDataStore(params);
         SimpleFeatureSource featureSource = dataStore.getFeatureSource("GEOTOOLS_CM");
@@ -174,8 +142,6 @@ public class PhoenixDataStoreFactoryTest {
                 for (Property property : feature.getProperties()) {
                     System.out.println("\t" + property.getName() + " = " + property.getValue());
                 }
-                Geometry geometry = (Geometry) feature.getDefaultGeometry();
-                System.out.println(feature.getID() + " location " + geometry);
             }
         } catch (Exception e) {
             iterator.close();

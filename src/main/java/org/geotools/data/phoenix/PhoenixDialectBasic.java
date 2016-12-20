@@ -6,6 +6,7 @@ import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKBReader;
 import com.vividsolutions.jts.io.WKBWriter;
+import com.vividsolutions.jts.io.WKTWriter;
 import org.geotools.data.jdbc.FilterToSQL;
 import org.geotools.jdbc.BasicSQLDialect;
 import org.geotools.jdbc.JDBCDataStore;
@@ -189,7 +190,7 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     @Override
     public void encodeGeometryValue(Geometry value, int dimension, int srid, StringBuffer sql) throws IOException {
         if (value != null && !value.isEmpty()) {
-            sql.append("'").append(new String(new WKBWriter().write(value))).append("'");
+            sql.append("'").append(new WKTWriter().write(value)).append("'");
         } else {
             sql.append("NULL");
         }
