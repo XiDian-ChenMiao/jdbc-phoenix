@@ -367,9 +367,6 @@ public class PhoenixDialect extends SQLDialect {
         /*使几何列非空，目的在于其上建立索引*/
         if (att instanceof GeometryDescriptor && !att.isNillable()) {
             sql.append(" NOT NULL");
-            Class binding = att.getType().getBinding();
-            if (isConcreteGeometry(binding))
-                sql.append(" COMMENT '").append(binding.getSimpleName().toUpperCase()).append("'");
         }
     }
 
