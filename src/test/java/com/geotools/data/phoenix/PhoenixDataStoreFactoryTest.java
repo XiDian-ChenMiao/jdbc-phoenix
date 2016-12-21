@@ -36,7 +36,9 @@ import org.opengis.filter.identity.FeatureId;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.*;
 
 /**
@@ -186,8 +188,43 @@ public class PhoenixDataStoreFactoryTest {
         jdbcDataStore.createSchema(simpleFeatureType);
     }
 
+    @Test
+    public void testCreateFunction() throws IOException {
+        Properties properties = new Properties();
+        properties.setProperty("phoenix.functions.allowUserDefinedFunctions", "true");
+        Connection connection = null;
+        Statement statement = null;
+        try {
+            Class.forName("org.apache.phoenix.jdbc.PhoenixDriver");// 加载Mysql数据驱动
+            String url = "jdbc:phoenix:cloudgis1.com:2181:/hbase-unsecure";//phoenix连接URL
+            connection = DriverManager.getConnection(url,properties);// 创建数据连接
+            connection.setAutoCommit(false);
+            statement = connection.createStatement();
+
+            String sql = "CREATE FUNCTION REVERSE(VARCHAR) RETURNS VARCHAR AS " +
+                    "'org.geotools.data.phoenix.function.ReverseFunction' USING jar 'hdfs://cloudgis/apps/hbase/data/lib/REVERSE-CM.jar'";
+            statement.execute(sql);
+        } catch (Exception e) {
+            System.out.println("数据库连接失败" + e.getMessage());
+        } finally {
+            if (connection != null)
+                try {
+                    connection.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            if (statement != null)
+                try {
+                    statement.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+        }
+
+    }
+
     public static void main(String[] args) throws IOException, CQLException {
         PhoenixDataStoreFactoryTest test = new PhoenixDataStoreFactoryTest();
-        test.testSearch();
+        test.testCreateFunction();
     }
 }
