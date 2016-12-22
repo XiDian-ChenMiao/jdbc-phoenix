@@ -1,45 +1,42 @@
 package com.geotools.data.phoenix;
 
-import com.vividsolutions.jts.geom.*;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.GeometryFactory;
+import com.vividsolutions.jts.geom.Point;
+import com.vividsolutions.jts.geom.PrecisionModel;
 import org.geotools.data.*;
 import org.geotools.data.collection.ListFeatureCollection;
 import org.geotools.data.jdbc.FilterToSQL;
 import org.geotools.data.jdbc.datasource.DBCPDataSourceFactory;
 import org.geotools.data.jdbc.datasource.DataSourceFinder;
 import org.geotools.data.phoenix.PhoenixDataStoreFactory;
-import org.geotools.data.phoenix.PhoenixDialectBasic;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.data.simple.SimpleFeatureStore;
-import org.geotools.data.store.ContentEntry;
-import org.geotools.data.store.ContentFeatureSource;
 import org.geotools.factory.CommonFactoryFinder;
-import org.geotools.feature.FeatureComparators;
-import org.geotools.feature.NameImpl;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.filter.text.cql2.CQL;
 import org.geotools.filter.text.cql2.CQLException;
-import org.geotools.jdbc.*;
+import org.geotools.jdbc.JDBCDataStore;
+import org.geotools.jdbc.PrimaryKeyFinder;
 import org.junit.Test;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
-import org.opengis.feature.type.Name;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory;
 import org.opengis.filter.PropertyIsEqualTo;
 import org.opengis.filter.expression.Expression;
-import org.opengis.filter.identity.FeatureId;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 文件描述：Phoenix数据库的简单测试类
@@ -157,7 +154,7 @@ public class PhoenixDataStoreFactoryTest {
         FilterFactory filterFactory = CommonFactoryFinder.getFilterFactory(null);
         Expression literal = filterFactory.literal(1);
         Expression prop = filterFactory.property("INTPROPERRTY");
-        PropertyIsEqualTo filter= filterFactory.equals(prop, literal);
+        PropertyIsEqualTo filter = filterFactory.equals(prop, literal);
         StringWriter buffer = new StringWriter();
         FilterToSQL filterToSQL = new FilterToSQL(buffer);
         filterToSQL.setFeatureType(type);
@@ -186,45 +183,5 @@ public class PhoenixDataStoreFactoryTest {
         SimpleFeatureType simpleFeatureType = typeBuilder.buildFeatureType();
         JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
         jdbcDataStore.createSchema(simpleFeatureType);
-    }
-
-    @Test
-    public void testCreateFunction() throws IOException {
-        Properties properties = new Properties();
-        properties.setProperty("phoenix.functions.allowUserDefinedFunctions", "true");
-        Connection connection = null;
-        Statement statement = null;
-        try {
-            Class.forName("org.apache.phoenix.jdbc.PhoenixDriver");// 加载Mysql数据驱动
-            String url = "jdbc:phoenix:cloudgis1.com:2181:/hbase-unsecure";//phoenix连接URL
-            connection = DriverManager.getConnection(url,properties);// 创建数据连接
-            connection.setAutoCommit(false);
-            statement = connection.createStatement();
-
-            String sql = "CREATE FUNCTION REVERSE(VARCHAR) RETURNS VARCHAR AS " +
-                    "'org.geotools.data.phoenix.function.ReverseFunction' USING jar 'hdfs://cloudgis/apps/hbase/data/lib/REVERSE-CM.jar'";
-            statement.execute(sql);
-        } catch (Exception e) {
-            System.out.println("数据库连接失败" + e.getMessage());
-        } finally {
-            if (connection != null)
-                try {
-                    connection.close();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
-            if (statement != null)
-                try {
-                    statement.close();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
-        }
-
-    }
-
-    public static void main(String[] args) throws IOException, CQLException {
-        PhoenixDataStoreFactoryTest test = new PhoenixDataStoreFactoryTest();
-        test.testCreateFunction();
     }
 }

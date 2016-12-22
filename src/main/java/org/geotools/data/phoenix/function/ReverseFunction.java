@@ -19,7 +19,7 @@ import java.util.List;
 @FunctionParseNode.BuiltInFunction(name = ReverseFunction.NAME, args = {@FunctionParseNode.Argument(allowedTypes = {PVarchar.class})})
 public class ReverseFunction extends ScalarFunction {
 
-    protected final static String NAME = "REVERSE";
+    protected final static String NAME = "ST_REVERSE";
 
     public ReverseFunction() {
 
