@@ -12,6 +12,8 @@ import org.apache.phoenix.schema.tuple.Tuple;
 import org.apache.phoenix.schema.types.PDataType;
 import org.apache.phoenix.schema.types.PDouble;
 import org.apache.phoenix.schema.types.PVarchar;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -23,6 +25,8 @@ import java.util.List;
 public class DistanceFunction extends ScalarFunction {
 
     protected final static String NAME = "ST_DISTANCE";
+
+    protected final static Logger logger = LoggerFactory.getLogger(DistanceFunction.class);
 
     public DistanceFunction() {}
 
@@ -47,6 +51,8 @@ public class DistanceFunction extends ScalarFunction {
             e.printStackTrace();
         }
 
+        logger.debug(geoOne.toString());
+
         Expression twoParam = children.get(1);
         if (!twoParam.evaluate(tuple, ptr))
             return false;
@@ -57,9 +63,11 @@ public class DistanceFunction extends ScalarFunction {
             e.printStackTrace();
         }
 
+        logger.debug(geoTwo.toString());
+
         if (geoOne != null && geoTwo != null) {
             Double distance = geoOne.distance(geoTwo);/*两空间对象间的距离*/
-            ptr.set(PDouble.INSTANCE.toBytes(distance));
+            ptr.set(getDataType().toBytes(distance));
         } else {
             throw new IllegalDataException("parse geometry-wkt exception");
         }
