@@ -1,30 +1,13 @@
 package com.geotools.data.phoenix;
 
-import org.geotools.data.DataStoreFinder;
-import org.geotools.data.FeatureReader;
-import org.geotools.data.Query;
-import org.geotools.data.Transaction;
-import org.geotools.data.jdbc.FilterToSQL;
 import org.geotools.data.jdbc.FilterToSQLException;
 import org.geotools.data.phoenix.PhoenixDataStoreFactory;
-import org.geotools.factory.CommonFactoryFinder;
-import org.geotools.filter.text.cql2.CQL;
 import org.geotools.filter.text.cql2.CQLException;
-import org.geotools.jdbc.JDBCDataStore;
 import org.junit.Test;
-import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
-import org.opengis.filter.Filter;
-import org.opengis.filter.FilterFactory;
-import org.opengis.filter.PropertyIsEqualTo;
-import org.opengis.filter.PropertyIsGreaterThan;
-import org.opengis.filter.expression.Expression;
 
 import java.io.IOException;
-import java.io.StringWriter;
 import java.sql.*;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -150,6 +133,9 @@ public class PhoenixFunctionExtTest {
         return "DROP FUNCTION IF EXISTS " + funcName;
     }
 
+    /**
+     * 创建ST_REVERSE函数测试
+     */
     @Test
     public void testCreateReverseFunction() {
         try {
@@ -159,6 +145,9 @@ public class PhoenixFunctionExtTest {
         }
     }
 
+    /**
+     * 创建ST_DISTANCE函数测试
+     */
     @Test
     public void testCreateDistanceFunction() {
         try {
@@ -168,16 +157,25 @@ public class PhoenixFunctionExtTest {
         }
     }
 
+    /**
+     * 取消ST_REVERSE函数测试
+     */
     @Test
     public void testDropReverseFunction() {
         dropFunction("ST_REVERSE");
     }
 
+    /**
+     * 取消ST_DISTANCE函数测试
+     */
     @Test
     public void testDropDistanceFunction() {
         dropFunction("ST_DISTANCE");
     }
 
+    /**
+     * 使用ST_DISTANCE函数测试
+     */
     @Test
     public void testUseDistanceFunction() throws IOException, FilterToSQLException, CQLException {
         Connection connection = null;
@@ -217,6 +215,9 @@ public class PhoenixFunctionExtTest {
         }
     }
 
+    /**
+     * 使用ST_REVERSE函数测试
+     */
     @Test
     public void testUseReverseFunction() {
         Connection connection = null;

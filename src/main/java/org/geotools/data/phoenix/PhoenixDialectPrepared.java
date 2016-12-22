@@ -18,7 +18,7 @@ import java.sql.SQLException;
 import java.util.Map;
 
 /**
- * 文件描述：
+ * 文件描述：PhoenixDialectPrepared
  * 创建作者：陈苗
  * 创建时间：2016/11/7 11:39
  */
