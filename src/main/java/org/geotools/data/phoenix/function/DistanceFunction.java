@@ -1,5 +1,6 @@
 package org.geotools.data.phoenix.function;
 
+import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKTReader;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
@@ -11,7 +12,6 @@ import org.apache.phoenix.schema.tuple.Tuple;
 import org.apache.phoenix.schema.types.PDataType;
 import org.apache.phoenix.schema.types.PDouble;
 import org.apache.phoenix.schema.types.PVarchar;
-import org.opengis.geometry.Geometry;
 
 import java.util.List;
 
@@ -44,7 +44,7 @@ public class DistanceFunction extends ScalarFunction {
             return false;
         Geometry geoOne = null;
         try {
-            geoOne = (Geometry) new WKTReader().read((String) PVarchar.INSTANCE.toObject(ptr, oneParam.getDataType()));
+            geoOne = new WKTReader().read((String) PVarchar.INSTANCE.toObject(ptr, oneParam.getDataType()));
         } catch (ParseException e) {
             e.printStackTrace();
         }
@@ -54,7 +54,7 @@ public class DistanceFunction extends ScalarFunction {
             return false;
         Geometry geoTwo = null;
         try {
-            geoTwo = (Geometry) new WKTReader().read((String) PVarchar.INSTANCE.toObject(ptr, twoParam.getDataType()));
+            geoTwo = new WKTReader().read((String) PVarchar.INSTANCE.toObject(ptr, twoParam.getDataType()));
         } catch (ParseException e) {
             e.printStackTrace();
         }
