@@ -184,12 +184,12 @@ public class PhoenixFunctionExtTest {
         try {
             connection = getConnection();
             statement = connection.createStatement();
-            result = statement.executeQuery("SELECT * FROM GEOTOOLS_CM WHERE ST_DISTANCE(GEOMETRY, 'POINT (0 0)') > 1.0");
+            result = statement.executeQuery("SELECT ST_DISTANCE(GEOMETRY, 'POINT (4 4)') AS distance FROM GEOTOOLS_CM");
             while (result.next()) {
-                System.out.println(result.getString(1));
+                System.out.println(result.getObject(1));
             }
         } catch (Exception e) {
-            System.out.println("create function exception : " + e.getMessage());
+            System.out.println("use function exception : " + e.getMessage());
         } finally {
             if (connection != null) {
                 try {
@@ -231,7 +231,7 @@ public class PhoenixFunctionExtTest {
                 System.out.println(result.getString(1));
             }
         } catch (Exception e) {
-            System.out.println("create function exception : " + e.getMessage());
+            System.out.println("use function exception : " + e.getMessage());
         } finally {
             if (connection != null) {
                 try {

@@ -17,8 +17,6 @@ import java.util.List;
 
 /**
  * ST_DISTANCE函数
- * @param PVarchar 第一个空间对象参数构成的WKT
- * @param PVarchar 第二个空间对象参数构成的WKT
  * Created by Administrator on 2016/12/22.
  */
 @FunctionParseNode.BuiltInFunction(name = DistanceFunction.NAME, args = {@FunctionParseNode.Argument(allowedTypes = {PVarchar.class, PVarchar.class})})
@@ -50,7 +48,7 @@ public class DistanceFunction extends ScalarFunction {
         }
 
         Expression twoParam = children.get(1);
-        if (!oneParam.evaluate(tuple, ptr))
+        if (!twoParam.evaluate(tuple, ptr))
             return false;
         Geometry geoTwo = null;
         try {
@@ -61,7 +59,7 @@ public class DistanceFunction extends ScalarFunction {
 
         if (geoOne != null && geoTwo != null) {
             Double distance = geoOne.distance(geoTwo);/*两空间对象间的距离*/
-            ptr.set(PDouble.INSTANCE.toBytes(distance));/*返回距离结果*/
+            ptr.set(PDouble.INSTANCE.toBytes(distance));
         } else {
             throw new IllegalDataException("parse geometry-wkt exception");
         }
