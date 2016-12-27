@@ -2,6 +2,7 @@ package com.geotools.data.phoenix;
 
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.LineString;
+import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKTReader;
 import org.geotools.geometry.jts.JTSFactoryFinder;
@@ -27,6 +28,9 @@ public class JtsGeometryOperationTest {
     public void testDistance() throws ParseException {
         Geometry one = READER.read("POINT (0 0)");
         Geometry two = READER.read("POINT (1 1)");
+        Point point = (Point) two;
+        System.out.println("longtitude:" + point.getCoordinate().getOrdinate(0));
+        System.out.println("lantitude:" + point.getCoordinate().getOrdinate(1));
         System.out.println("distance:" + one.distance(two));
     }
 

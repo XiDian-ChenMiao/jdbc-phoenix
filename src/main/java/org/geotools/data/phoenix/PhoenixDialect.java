@@ -12,6 +12,7 @@ import org.geotools.referencing.CRS;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.feature.type.GeometryDescriptor;
+import org.opengis.feature.type.GeometryType;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
@@ -83,7 +84,7 @@ public class PhoenixDialect extends SQLDialect {
         }
     };
     /**
-     * 创建索引的后缀名
+     * 默认的创建索引的后缀名
      */
     private static String INDEX_SUFFIX = "_idx";
     /**
@@ -135,11 +136,11 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public void encodeTableName(String raw, StringBuffer sql) {
+        super.encodeTableName(raw, sql);
         if (sql.toString().toUpperCase().indexOf("INSERT") >= 0) {
             int startIndex = sql.toString().toUpperCase().indexOf("INSERT");
             sql.replace(startIndex, startIndex + 6, "UPSERT");
         }
-        super.encodeTableName(raw, sql);
     }
 
     /**
@@ -237,7 +238,7 @@ public class PhoenixDialect extends SQLDialect {
     }
 
     /**
-     * 将数据库空间列中取出的二进制流利用WKB读取成为一个空间对象
+     * 在结果集中将空间类型的数据转化为空间对象
      * @param descriptor
      * @param rs
      * @param column
@@ -249,14 +250,14 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public Geometry decodeGeometryValue(GeometryDescriptor descriptor, ResultSet rs, String column, GeometryFactory factory, Connection cx) throws IOException, SQLException {
-        byte[] bytes = rs.getBytes(column);
-        if (bytes == null) {
+        String geoWktStr = rs.getString(column);
+        if (geoWktStr == null) {
             return null;
         }
         try {
-            return new WKBReader(factory).read(bytes);
+            return new WKTReader(factory).read(geoWktStr);
         } catch (ParseException e) {
-            String msg = "Error decoding wkb";
+            String msg = "Error decoding wkt";
             throw (IOException) new IOException(msg).initCause(e);
         }
     }
@@ -421,25 +422,12 @@ public class PhoenixDialect extends SQLDialect {
         for (AttributeDescriptor attributeDescriptor : featureType.getAttributeDescriptors()) {
             if (!(attributeDescriptor instanceof GeometryDescriptor))
                 continue;
+
             GeometryDescriptor gd = (GeometryDescriptor) attributeDescriptor;
             if (!attributeDescriptor.isNillable()) {
-                StringBuffer sql = new StringBuffer("CREATE INDEX ");
-                encodeColumnName(null, gd.getLocalName() + INDEX_SUFFIX, sql);
-                sql.append(" ON ");
-                sql.append(schemaName == null ? "" : schemaName + ".");
-                encodeTableName(featureType.getTypeName(), sql);
-                sql.append("(");
-                encodeColumnName(null, gd.getLocalName(), sql);
-                sql.append(")");
-
-                LOGGER.fine(sql.toString());
-                Statement statement = cx.createStatement();
-                try {
-                    statement.execute(sql.toString());
-                } finally {
-                    dataStore.closeSafe(statement);
-                }
+                createGeometryIndex(schemaName, featureType, cx, gd);
             }
+
             CoordinateReferenceSystem crs = gd.getCoordinateReferenceSystem();
             int srid = -1;
             if (crs != null) {
@@ -451,6 +439,7 @@ public class PhoenixDialect extends SQLDialect {
                 }
                 srid = i != null ? i : srid;
             }
+
             StringBuffer sql = new StringBuffer("UPSERT INTO ");
             encodeTableName("geometry_columns", sql);
             sql.append(" VALUES (").append("'").append(UUID.randomUUID().toString().replace("-", "")).append("', ");
@@ -468,6 +457,91 @@ public class PhoenixDialect extends SQLDialect {
             } finally {
                 dataStore.closeSafe(st);
             }
+        }
+    }
+
+    /**
+     * 关于空间列创建索引
+     * @param schemaName
+     * @param featureType
+     * @param cx
+     * @param gd
+     * @throws SQLException
+     */
+    private void createGeometryIndex(String schemaName, SimpleFeatureType featureType, Connection cx, GeometryDescriptor gd) throws SQLException {
+        createColumnAndIndexFromGeometryType(schemaName, featureType, cx, gd);
+        StringBuffer sql = new StringBuffer("CREATE INDEX ");
+        encodeColumnName(null, gd.getLocalName() + INDEX_SUFFIX, sql);
+        sql.append(" ON ");
+        sql.append(schemaName == null ? "" : schemaName + ".");
+        encodeTableName(featureType.getTypeName(), sql);
+        sql.append("(");
+        encodeColumnName(null, gd.getLocalName(), sql);
+        sql.append(")");
+
+        LOGGER.fine(sql.toString());
+        Statement statement = cx.createStatement();
+        try {
+            statement.execute(sql.toString());
+        } finally {
+            dataStore.closeSafe(statement);
+        }
+    }
+
+    /**
+     * 根据空间类型添加索引列以及在其上创建合适的索引
+     *（1）如果是POINT类型的列，则新创建一个新的GEOHASH列并在其上添加索引；
+     * @param schemaName
+     * @param featureType
+     * @param cx
+     * @param gd
+     * @throws SQLException
+     */
+    private void createColumnAndIndexFromGeometryType(String schemaName, SimpleFeatureType featureType, Connection cx, GeometryDescriptor gd) throws SQLException {
+        GeometryType type = gd.getType();
+        if (type != null) {
+            if (Point.class.equals(type.getBinding())) {
+                StringBuffer sql = new StringBuffer("ALTER TABLE ");
+                sql.append(schemaName == null ? "" : schemaName + ".");
+                encodeTableName(featureType.getTypeName(), sql);
+                sql.append("ADD IF NOT EXISTS ");
+                encodeColumnName(null, gd.getLocalName() + "_GEOHASH", sql);
+                sql.append(" BIGINT NOT NULL");
+                LOGGER.fine(sql.toString());
+                Statement statement = cx.createStatement();
+                try {
+                    statement.execute(sql.toString());
+                    createIndexOnNewColumn(schemaName, featureType.getTypeName(), cx, gd.getLocalName() + "_GEOHASH");
+                } finally {
+                    dataStore.closeSafe(statement);
+                }
+            }
+        }
+    }
+
+    /**
+     * 在新创建的列上创建索引
+     * @param schemaName
+     * @param tableName
+     * @param cx
+     * @param columnName
+     */
+    private void createIndexOnNewColumn(String schemaName, String tableName, Connection cx, String columnName) throws SQLException {
+        StringBuffer sql = new StringBuffer("CREATE INDEX ");
+        encodeColumnName(null, columnName + INDEX_SUFFIX, sql);
+        sql.append(" ON ");
+        sql.append(schemaName == null ? "" : schemaName + ".");
+        encodeTableName(tableName, sql);
+        sql.append("(");
+        encodeColumnName(null, columnName, sql);
+        sql.append(")");
+
+        LOGGER.fine(sql.toString());
+        Statement statement = cx.createStatement();
+        try {
+            statement.execute(sql.toString());
+        } finally {
+            dataStore.closeSafe(statement);
         }
     }
 
