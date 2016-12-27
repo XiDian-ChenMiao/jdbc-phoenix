@@ -139,7 +139,7 @@ public class PhoenixFunctionExtTest {
     @Test
     public void testCreateReverseFunction() {
         try {
-            createFunction("ST_REVERSE(VARCHAR)", "VARCHAR", "org.geotools.data.phoenix.function.ReverseFunction", "hdfs://cloudgis/apps/hbase/data/lib/phoenix-functions-ext.jar");
+            createFunction("ST_REVERSE(VARCHAR)", "VARCHAR", "org.geotools.data.phoenix.function.ReverseFunction", "hdfs://cloudgis/apps/hbase/data/lib/phoenix-udf.jar");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -151,7 +151,7 @@ public class PhoenixFunctionExtTest {
     @Test
     public void testCreateDistanceFunction() {
         try {
-            createFunction("ST_DISTANCE(VARCHAR, VARCHAR)", "DOUBLE", "org.geotools.data.phoenix.function.DistanceFunction", "hdfs://cloudgis/apps/hbase/data/lib/phoenix-functions-ext.jar");
+            createFunction("ST_DISTANCE(VARCHAR, VARCHAR, VARCHAR, VARCHAR)", "INTEGER", "org.geotools.data.phoenix.function.DistanceFunction", "hdfs://cloudgis/apps/hbase/data/lib/phoenix-udf.jar");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -184,9 +184,9 @@ public class PhoenixFunctionExtTest {
         try {
             connection = getConnection();
             statement = connection.createStatement();
-            result = statement.executeQuery("SELECT ST_DISTANCE(GEOMETRY, 'POINT (4 4)') AS distance FROM GEOTOOLS_CM");
+            result = statement.executeQuery("SELECT * FROM GEOTOOLS_CM WHERE ST_DISTANCE(GEOMETRY, 'POINT (4 4)', '>', '2.0') = 1");
             while (result.next()) {
-                System.out.println(result.getObject(1));
+                System.out.println(result.getDouble(2));
             }
         } catch (Exception e) {
             System.out.println("use function exception : " + e.getMessage());
@@ -263,6 +263,7 @@ public class PhoenixFunctionExtTest {
      */
     public static void main(String[] args) throws IOException, FilterToSQLException, CQLException {
         PhoenixFunctionExtTest test = new PhoenixFunctionExtTest();
-        test.testUseDistanceFunction();
+        test.testCreateDistanceFunction();
+        test.testCreateReverseFunction();
     }
 }

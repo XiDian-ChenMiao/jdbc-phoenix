@@ -10,23 +10,21 @@ import org.apache.phoenix.parse.FunctionParseNode;
 import org.apache.phoenix.schema.IllegalDataException;
 import org.apache.phoenix.schema.tuple.Tuple;
 import org.apache.phoenix.schema.types.PDataType;
-import org.apache.phoenix.schema.types.PDouble;
+import org.apache.phoenix.schema.types.PInteger;
 import org.apache.phoenix.schema.types.PVarchar;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
- * ST_DISTANCE函数
+ * ST_DISTANCE_EXT函数
  * Created by Administrator on 2016/12/22.
  */
-@FunctionParseNode.BuiltInFunction(name = DistanceFunction.NAME, args = {@FunctionParseNode.Argument(allowedTypes = {PVarchar.class, PVarchar.class})})
+@FunctionParseNode.BuiltInFunction(name = DistanceFunction.NAME, args = {@FunctionParseNode.Argument(allowedTypes = {PVarchar.class, PVarchar.class, PVarchar.class, PVarchar.class})})
 public class DistanceFunction extends ScalarFunction {
 
     protected final static String NAME = "ST_DISTANCE";
-
-    protected final static Logger logger = LoggerFactory.getLogger(DistanceFunction.class);
 
     public DistanceFunction() {}
 
@@ -41,41 +39,47 @@ public class DistanceFunction extends ScalarFunction {
 
     @Override
     public boolean evaluate(Tuple tuple, ImmutableBytesWritable ptr) {
-        Expression oneParam = children.get(0);
-        if (!oneParam.evaluate(tuple, ptr))
-            return false;
-        Geometry geoOne = null;
-        try {
-            geoOne = new WKTReader().read((String) PVarchar.INSTANCE.toObject(ptr, oneParam.getDataType()));
-        } catch (ParseException e) {
-            e.printStackTrace();
+        List<String> params = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            Expression param = children.get(i);
+            if (!param.evaluate(tuple, ptr))
+                return false;
+            params.add((String) PVarchar.INSTANCE.toObject(ptr, param.getDataType()));
         }
 
-        logger.debug(geoOne.toString());
-
-        Expression twoParam = children.get(1);
-        if (!twoParam.evaluate(tuple, ptr))
-            return false;
-        Geometry geoTwo = null;
+        Geometry geoOne, geoTwo;
         try {
-            geoTwo = new WKTReader().read((String) PVarchar.INSTANCE.toObject(ptr, twoParam.getDataType()));
+            geoOne = new WKTReader().read(params.get(0));
+            geoTwo = new WKTReader().read(params.get(1));
         } catch (ParseException e) {
-            e.printStackTrace();
+            throw new IllegalDataException("parse geometry-wkt exception");
         }
 
-        logger.debug(geoTwo.toString());
-
+        double compareValue;
+        Pattern pattern = Pattern.compile("^[-\\+]?[.\\d]*$");
+        if (pattern.matcher(params.get(3)).matches()) {
+            compareValue = Double.parseDouble(params.get(3));
+        } else {
+            throw new IllegalDataException("parse double parameter exception");
+        }
         if (geoOne != null && geoTwo != null) {
             Double distance = geoOne.distance(geoTwo);/*两空间对象间的距离*/
-            ptr.set(getDataType().toBytes(distance));
+            ptr.set(new byte[getDataType().getByteSize()]);
+            if (">".equals(params.get(2)))
+                getDataType().getCodec().encodeInt(distance > compareValue ? 1 : 0, ptr);
+            else if ("<".equals(params.get(2)))
+                getDataType().getCodec().encodeInt(distance < compareValue ? 1 : 0, ptr);
+            else
+                throw new IllegalDataException("parse comparator exception");
         } else {
             throw new IllegalDataException("parse geometry-wkt exception");
         }
         return true;
     }
 
+    @SuppressWarnings("rawtypes")
     @Override
     public PDataType getDataType() {
-        return PDouble.INSTANCE;
+        return PInteger.INSTANCE;
     }
 }

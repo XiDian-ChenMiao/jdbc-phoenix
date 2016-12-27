@@ -11,6 +11,8 @@ import org.opengis.filter.spatial.*;
 
 import java.io.IOException;
 
+import static org.geotools.filter.FilterCapabilities.SIMPLE_COMPARISONS_OPENGIS;
+
 /**
  * 文件描述：Phoenix specific filter encoder.
  * 创建作者：陈苗
@@ -25,6 +27,7 @@ public class PhoenixFilterToSQL extends FilterToSQL {
     protected FilterCapabilities createFilterCapabilities() {
         /*添加函数*/
         FilterCapabilities caps = super.createFilterCapabilities();
+        caps.addType(BBOX.class);
         caps.addType(Contains.class);
         caps.addType(Disjoint.class);
         caps.addType(Crosses.class);
@@ -33,6 +36,8 @@ public class PhoenixFilterToSQL extends FilterToSQL {
         caps.addType(Overlaps.class);
         caps.addType(Touches.class);
         caps.addType(Within.class);
+        caps.addType(DWithin.class);
+        caps.addType(Beyond.class);
         return caps;
     }
 
