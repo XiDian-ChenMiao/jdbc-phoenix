@@ -469,7 +469,6 @@ public class PhoenixDialect extends SQLDialect {
      * @throws SQLException
      */
     private void createGeometryIndex(String schemaName, SimpleFeatureType featureType, Connection cx, GeometryDescriptor gd) throws SQLException {
-        createColumnAndIndexFromGeometryType(schemaName, featureType, cx, gd);
         StringBuffer sql = new StringBuffer("CREATE INDEX ");
         encodeColumnName(null, gd.getLocalName() + INDEX_SUFFIX, sql);
         sql.append(" ON ");
@@ -485,37 +484,6 @@ public class PhoenixDialect extends SQLDialect {
             statement.execute(sql.toString());
         } finally {
             dataStore.closeSafe(statement);
-        }
-    }
-
-    /**
-     * 根据空间类型添加索引列以及在其上创建合适的索引
-     *（1）如果是POINT类型的列，则新创建一个新的GEOHASH列并在其上添加索引；
-     * @param schemaName
-     * @param featureType
-     * @param cx
-     * @param gd
-     * @throws SQLException
-     */
-    private void createColumnAndIndexFromGeometryType(String schemaName, SimpleFeatureType featureType, Connection cx, GeometryDescriptor gd) throws SQLException {
-        GeometryType type = gd.getType();
-        if (type != null) {
-            if (Point.class.equals(type.getBinding())) {
-                StringBuffer sql = new StringBuffer("ALTER TABLE ");
-                sql.append(schemaName == null ? "" : schemaName + ".");
-                encodeTableName(featureType.getTypeName(), sql);
-                sql.append("ADD IF NOT EXISTS ");
-                encodeColumnName(null, gd.getLocalName() + "_GEOHASH", sql);
-                sql.append(" BIGINT NOT NULL");
-                LOGGER.fine(sql.toString());
-                Statement statement = cx.createStatement();
-                try {
-                    statement.execute(sql.toString());
-                    createIndexOnNewColumn(schemaName, featureType.getTypeName(), cx, gd.getLocalName() + "_GEOHASH");
-                } finally {
-                    dataStore.closeSafe(statement);
-                }
-            }
         }
     }
 
