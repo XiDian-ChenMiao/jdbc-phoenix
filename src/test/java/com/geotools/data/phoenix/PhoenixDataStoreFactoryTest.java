@@ -15,8 +15,12 @@ import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.data.simple.SimpleFeatureStore;
 import org.geotools.factory.CommonFactoryFinder;
+import org.geotools.factory.Hints;
+import org.geotools.feature.NameImpl;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
+import org.geotools.feature.type.AttributeDescriptorImpl;
+import org.geotools.feature.type.AttributeTypeImpl;
 import org.geotools.filter.text.cql2.CQL;
 import org.geotools.filter.text.cql2.CQLException;
 import org.geotools.jdbc.JDBCDataStore;
@@ -25,6 +29,9 @@ import org.junit.Test;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.AttributeDescriptor;
+import org.opengis.feature.type.AttributeType;
+import org.opengis.feature.type.Name;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory;
 import org.opengis.filter.PropertyIsEqualTo;
@@ -175,13 +182,23 @@ public class PhoenixDataStoreFactoryTest {
     @Test
     public void testCreateTable() throws IOException {
         SimpleFeatureTypeBuilder typeBuilder = new SimpleFeatureTypeBuilder();
+        Name geoName = new NameImpl("geometry");
+        AttributeType p = new AttributeTypeImpl(geoName, Point.class, false, false, null, null, null);
+        AttributeDescriptor ad = new AttributeDescriptorImpl(p, geoName, Integer.MIN_VALUE, Integer.MAX_VALUE, false, null);
+        typeBuilder.set("geometry", ad);
         typeBuilder.add("geometry", Point.class, 4326);
         typeBuilder.add("intProperty", Integer.class);
         typeBuilder.add("stringProperty", String.class);
         typeBuilder.setName("GEOTOOLS_CM");
 
+
         SimpleFeatureType simpleFeatureType = typeBuilder.buildFeatureType();
         JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
         jdbcDataStore.createSchema(simpleFeatureType);
+    }
+
+    public static void main(String[] args) throws IOException {
+        PhoenixDataStoreFactoryTest test = new PhoenixDataStoreFactoryTest();
+        test.testCreateTable();
     }
 }
