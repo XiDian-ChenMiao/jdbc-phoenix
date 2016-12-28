@@ -488,32 +488,6 @@ public class PhoenixDialect extends SQLDialect {
     }
 
     /**
-     * 在新创建的列上创建索引
-     * @param schemaName
-     * @param tableName
-     * @param cx
-     * @param columnName
-     */
-    private void createIndexOnNewColumn(String schemaName, String tableName, Connection cx, String columnName) throws SQLException {
-        StringBuffer sql = new StringBuffer("CREATE INDEX ");
-        encodeColumnName(null, columnName + INDEX_SUFFIX, sql);
-        sql.append(" ON ");
-        sql.append(schemaName == null ? "" : schemaName + ".");
-        encodeTableName(tableName, sql);
-        sql.append("(");
-        encodeColumnName(null, columnName, sql);
-        sql.append(")");
-
-        LOGGER.fine(sql.toString());
-        Statement statement = cx.createStatement();
-        try {
-            statement.execute(sql.toString());
-        } finally {
-            dataStore.closeSafe(statement);
-        }
-    }
-
-    /**
      * 从元数据表中获取空间参考ID
      * @param schemaName The database schema, could be <code>null</code>.
      * @param tableName  The table, never <code>null</code>.
