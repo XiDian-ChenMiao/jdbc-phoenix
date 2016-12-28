@@ -8,6 +8,7 @@ import com.vividsolutions.jts.io.WKBReader;
 import com.vividsolutions.jts.io.WKTWriter;
 import org.geotools.data.jdbc.FilterToSQL;
 import org.geotools.jdbc.BasicSQLDialect;
+import org.geotools.jdbc.Index;
 import org.geotools.jdbc.JDBCDataStore;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
@@ -242,5 +243,15 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     @Override
     public boolean isAutoCommitQuery() {
         return delegate.isAutoCommitQuery();
+    }
+
+    @Override
+    public void createIndex(Connection cx, SimpleFeatureType schema, String databaseSchema, Index index) throws SQLException {
+        delegate.createIndex(cx, schema, databaseSchema, index);
+    }
+
+    @Override
+    public void dropIndex(Connection cx, SimpleFeatureType schema, String databaseSchema, String indexName) throws SQLException {
+        delegate.dropIndex(cx, schema, databaseSchema, indexName);
     }
 }

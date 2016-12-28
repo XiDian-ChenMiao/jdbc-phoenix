@@ -6,6 +6,7 @@ import com.vividsolutions.jts.io.WKBReader;
 import com.vividsolutions.jts.io.WKTReader;
 import org.geotools.factory.Hints;
 import org.geotools.geometry.jts.Geometries;
+import org.geotools.jdbc.Index;
 import org.geotools.jdbc.JDBCDataStore;
 import org.geotools.jdbc.SQLDialect;
 import org.geotools.referencing.CRS;
@@ -725,6 +726,48 @@ public class PhoenixDialect extends SQLDialect {
         try {
             statement = cx.createStatement();
             statement.execute(sql.toString());
+            if (!cx.getAutoCommit()) {
+                cx.commit();
+            }
+        } finally {
+            dataStore.closeSafe(cx);
+        }
+    }
+
+    /**
+     * 由于Phoenix不支持创建索引时指定UNIQUE属性，所以在此重新覆写创建索引函数
+     * @param cx
+     * @param schema
+     * @param databaseSchema
+     * @param index
+     * @throws SQLException
+     */
+    @Override
+    public void createIndex(Connection cx, SimpleFeatureType schema, String databaseSchema, Index index) throws SQLException {
+        StringBuffer sql = new StringBuffer();
+        String escape = getNameEscape();
+        sql.append("CREATE INDEX IF NOT EXISTS ");
+        if (supportsSchemaForIndex() && databaseSchema != null) {
+            encodeSchemaName(databaseSchema, sql);
+            sql.append(".");
+        }
+        sql.append(escape).append(index.getIndexName()).append(escape);
+        sql.append(" ON ");
+        if (databaseSchema != null) {
+            encodeSchemaName(databaseSchema, sql);
+            sql.append(".");
+        }
+        sql.append(escape).append(index.getTypeName()).append(escape).append("(");
+        for (String attribute : index.getAttributes()) {
+            sql.append(escape).append(attribute).append(escape).append(", ");
+        }
+        sql.setLength(sql.length() - 2);
+        sql.append(")");
+
+        Statement st;
+        try {
+            st = cx.createStatement();
+            st.execute(sql.toString());
             if (!cx.getAutoCommit()) {
                 cx.commit();
             }

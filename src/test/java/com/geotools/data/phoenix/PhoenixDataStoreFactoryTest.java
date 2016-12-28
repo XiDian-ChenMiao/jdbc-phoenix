@@ -16,7 +16,6 @@ import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.data.simple.SimpleFeatureStore;
 import org.geotools.factory.CommonFactoryFinder;
-import org.geotools.factory.Hints;
 import org.geotools.feature.NameImpl;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
@@ -24,6 +23,7 @@ import org.geotools.feature.type.AttributeDescriptorImpl;
 import org.geotools.feature.type.AttributeTypeImpl;
 import org.geotools.filter.text.cql2.CQL;
 import org.geotools.filter.text.cql2.CQLException;
+import org.geotools.jdbc.Index;
 import org.geotools.jdbc.JDBCDataStore;
 import org.geotools.jdbc.PrimaryKeyFinder;
 import org.junit.Test;
@@ -183,24 +183,32 @@ public class PhoenixDataStoreFactoryTest {
     @Test
     public void testCreateTable() throws IOException {
         SimpleFeatureTypeBuilder typeBuilder = new SimpleFeatureTypeBuilder();
-        Name geoName = new NameImpl("geometry");
-        AttributeType p = new AttributeTypeImpl(geoName, Point.class, false, false, null, null, null);
-        AttributeDescriptor ad = new AttributeDescriptorImpl(p, geoName, Integer.MIN_VALUE, Integer.MAX_VALUE, false, null);
-        typeBuilder.set("geometry", ad);
         typeBuilder.add("geometry", Point.class, 4326);
         typeBuilder.add("intProperty", Integer.class);
         typeBuilder.add("stringProperty", String.class);
         typeBuilder.add("geohash", Long.class);
         typeBuilder.setName("GEOTOOLS_CM");
 
-
         SimpleFeatureType simpleFeatureType = typeBuilder.buildFeatureType();
         JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
         jdbcDataStore.createSchema(simpleFeatureType);
     }
 
+    @Test
+    public void testCreateIndex() throws IOException {
+        JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
+        Index geoHashIndex = new Index("GEOTOOLS_CM", "GEOHASH_IDX", false, "geohash");
+        jdbcDataStore.createIndex(geoHashIndex);
+    }
+
+    @Test
+    public void testDropIndex() throws IOException {
+        JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
+        jdbcDataStore.dropIndex("GEOTOOLS_CM", "GEOHASH_IDX");
+    }
+
     public static void main(String[] args) throws IOException {
         PhoenixDataStoreFactoryTest test = new PhoenixDataStoreFactoryTest();
-        test.testCreateTable();
+        test.testCreateIndex();
     }
 }
