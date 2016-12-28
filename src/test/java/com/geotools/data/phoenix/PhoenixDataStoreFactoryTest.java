@@ -10,6 +10,7 @@ import org.geotools.data.jdbc.FilterToSQL;
 import org.geotools.data.jdbc.datasource.DBCPDataSourceFactory;
 import org.geotools.data.jdbc.datasource.DataSourceFinder;
 import org.geotools.data.phoenix.PhoenixDataStoreFactory;
+import org.geotools.data.phoenix.util.GeoHashConverter;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.data.simple.SimpleFeatureSource;
@@ -112,8 +113,8 @@ public class PhoenixDataStoreFactoryTest {
 
         GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
-        infos.add(builder.buildFeature("1", new Object[]{geometryFactory.createPoint(new Coordinate(1, 1)), 1, "1"}));
-        infos.add(builder.buildFeature("2", new Object[]{geometryFactory.createPoint(new Coordinate(2, 2)), 2, "2"}));
+        infos.add(builder.buildFeature("1", new Object[]{geometryFactory.createPoint(new Coordinate(1, 1)), 1, "1", GeoHashConverter.longAndLatiToGeohash(1, 1)}));
+        infos.add(builder.buildFeature("2", new Object[]{geometryFactory.createPoint(new Coordinate(2, 2)), 2, "2", GeoHashConverter.longAndLatiToGeohash(2, 2)}));
 
         SimpleFeatureCollection collection = new ListFeatureCollection(schema, infos);
 
@@ -189,6 +190,7 @@ public class PhoenixDataStoreFactoryTest {
         typeBuilder.add("geometry", Point.class, 4326);
         typeBuilder.add("intProperty", Integer.class);
         typeBuilder.add("stringProperty", String.class);
+        typeBuilder.add("geohash", Long.class);
         typeBuilder.setName("GEOTOOLS_CM");
 
 
