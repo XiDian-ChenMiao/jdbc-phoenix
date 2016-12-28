@@ -16,11 +16,8 @@ import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.data.simple.SimpleFeatureStore;
 import org.geotools.factory.CommonFactoryFinder;
-import org.geotools.feature.NameImpl;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
-import org.geotools.feature.type.AttributeDescriptorImpl;
-import org.geotools.feature.type.AttributeTypeImpl;
 import org.geotools.filter.text.cql2.CQL;
 import org.geotools.filter.text.cql2.CQLException;
 import org.geotools.jdbc.Index;
@@ -30,9 +27,6 @@ import org.junit.Test;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
-import org.opengis.feature.type.AttributeDescriptor;
-import org.opengis.feature.type.AttributeType;
-import org.opengis.feature.type.Name;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory;
 import org.opengis.filter.PropertyIsEqualTo;
@@ -113,8 +107,8 @@ public class PhoenixDataStoreFactoryTest {
 
         GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
-        infos.add(builder.buildFeature("1", new Object[]{geometryFactory.createPoint(new Coordinate(1, 1)), 1, "1", GeoHashConverter.longAndLatiToGeohash(1, 1)}));
-        infos.add(builder.buildFeature("2", new Object[]{geometryFactory.createPoint(new Coordinate(2, 2)), 2, "2", GeoHashConverter.longAndLatiToGeohash(2, 2)}));
+        infos.add(builder.buildFeature("3", new Object[]{geometryFactory.createPoint(new Coordinate(3, 3)), 3, "3", GeoHashConverter.longAndLatiToGeohash(3, 3)}));
+        infos.add(builder.buildFeature("4", new Object[]{geometryFactory.createPoint(new Coordinate(4, 4)), 4, "4", GeoHashConverter.longAndLatiToGeohash(4, 4)}));
 
         SimpleFeatureCollection collection = new ListFeatureCollection(schema, infos);
 
@@ -209,6 +203,6 @@ public class PhoenixDataStoreFactoryTest {
 
     public static void main(String[] args) throws IOException {
         PhoenixDataStoreFactoryTest test = new PhoenixDataStoreFactoryTest();
-        test.testCreateIndex();
+        test.testAddFeatures();
     }
 }

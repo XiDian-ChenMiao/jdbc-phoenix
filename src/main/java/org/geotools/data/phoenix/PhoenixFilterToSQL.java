@@ -79,15 +79,15 @@ public class PhoenixFilterToSQL extends FilterToSQL {
                 e1.accept(this, extraData);
                 out.write(", ");
                 e2.accept(this, extraData);
-                out.write(")");
                 if (filter instanceof DWithin) {
-                    out.write("<");
+                    out.write("'<', '");
                 } else if (filter instanceof Beyond) {
-                    out.write(">");
+                    out.write("'>', '");
                 } else {
                     throw new RuntimeException("Unknown distance operator");
                 }
                 out.write(Double.toString(((DistanceBufferOperator) filter).getDistance()));
+                out.write("') = 1");
             } else {
                 if (filter instanceof Contains) {
                     out.write("ST_CONTAINS(");
@@ -119,7 +119,7 @@ public class PhoenixFilterToSQL extends FilterToSQL {
                     e2.accept(this, extraData);
                 }
 
-                out.write(")");
+                out.write(") = 1");
             }
         } catch (IOException e) {
             throw new RuntimeException(e);

@@ -139,7 +139,9 @@ public class PhoenixFunctionExtTest {
     @Test
     public void testCreateReverseFunction() {
         try {
-            createFunction("ST_REVERSE(VARCHAR)", "VARCHAR", "org.geotools.data.phoenix.function.ReverseFunction", "hdfs://cloudgis/apps/hbase/data/lib/phoenix-udf.jar");
+            createFunction("ST_REVERSE(VARCHAR)", "VARCHAR",
+                    "org.geotools.data.phoenix.function.ReverseFunction",
+                    "hdfs://cloudgis/apps/hbase/data/lib/phoenix-functions-udf.jar");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -151,10 +153,28 @@ public class PhoenixFunctionExtTest {
     @Test
     public void testCreateDistanceFunction() {
         try {
-            createFunction("ST_DISTANCE(VARCHAR, VARCHAR, VARCHAR, VARCHAR)", "INTEGER", "org.geotools.data.phoenix.function.DistanceFunction", "hdfs://cloudgis/apps/hbase/data/lib/phoenix-udf.jar");
+            createFunction("ST_DISTANCE(VARCHAR, VARCHAR, VARCHAR, VARCHAR)", "INTEGER",
+                    "org.geotools.data.phoenix.function.DistanceFunction",
+                    "hdfs://cloudgis/apps/hbase/data/lib/phoenix-functions-udf.jar");
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    @Test
+    public void testCreateEqualsFunction() {
+        try {
+            createFunction("ST_EQUALS(VARCHAR, VARCHAR)", "INTEGER",
+                    "org.geotools.data.phoenix.function.EqualsFunction",
+                    "hdfs://cloudgis/apps/hbase/data/lib/phoenix-functions-udf.jar");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void testDropEqualsFunction() {
+        dropFunction("ST_EQUALS");
     }
 
     /**
@@ -186,7 +206,7 @@ public class PhoenixFunctionExtTest {
             statement = connection.createStatement();
             result = statement.executeQuery("SELECT * FROM GEOTOOLS_CM WHERE ST_DISTANCE(GEOMETRY, 'POINT (4 4)', '>', '2.0') = 1");
             while (result.next()) {
-                System.out.println(result.getDouble(2));
+                System.out.println(result.getObject(2));
             }
         } catch (Exception e) {
             System.out.println("use function exception : " + e.getMessage());
@@ -257,13 +277,51 @@ public class PhoenixFunctionExtTest {
         }
     }
 
+    @Test
+    public void testUseEqualsFunction() {
+        Connection connection = null;
+        Statement statement = null;
+        ResultSet result = null;
+        try {
+            connection = getConnection();
+            statement = connection.createStatement();
+            result = statement.executeQuery("SELECT ST_EQUALS(GEOMETRY, 'POINT (2 2)') FROM GEOTOOLS_CM");
+            while (result.next()) {
+                System.out.println(result.getObject(1));
+            }
+        } catch (Exception e) {
+            System.out.println("use function exception : " + e.getMessage());
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (statement != null) {
+                try {
+                    statement.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (result != null) {
+                try {
+                    result.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
     /**
      * 主函数
      * @param args
      */
     public static void main(String[] args) throws IOException, FilterToSQLException, CQLException {
         PhoenixFunctionExtTest test = new PhoenixFunctionExtTest();
-        test.testCreateDistanceFunction();
-        test.testCreateReverseFunction();
+        test.testUseEqualsFunction();
     }
 }

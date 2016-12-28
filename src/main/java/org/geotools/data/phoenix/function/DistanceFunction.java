@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * ST_DISTANCE_EXT函数
+ * ST_DISTANCE函数
  * Created by Administrator on 2016/12/22.
  */
 @FunctionParseNode.BuiltInFunction(name = DistanceFunction.NAME, args = {@FunctionParseNode.Argument(allowedTypes = {PVarchar.class, PVarchar.class, PVarchar.class, PVarchar.class})})

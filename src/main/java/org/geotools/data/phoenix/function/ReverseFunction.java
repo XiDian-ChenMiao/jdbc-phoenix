@@ -62,7 +62,8 @@ public class ReverseFunction extends ScalarFunction {
         return getChildren().get(0).getSortOrder();
     }
 
-    @Override
+    @SuppressWarnings("rawtypes")
+	@Override
     public PDataType getDataType() {
         return PVarchar.INSTANCE;
     }

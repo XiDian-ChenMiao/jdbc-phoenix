@@ -9,10 +9,11 @@ import org.apache.phoenix.expression.function.ScalarFunction;
 import org.apache.phoenix.parse.FunctionParseNode;
 import org.apache.phoenix.schema.IllegalDataException;
 import org.apache.phoenix.schema.tuple.Tuple;
-import org.apache.phoenix.schema.types.PBoolean;
 import org.apache.phoenix.schema.types.PDataType;
+import org.apache.phoenix.schema.types.PInteger;
 import org.apache.phoenix.schema.types.PVarchar;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -39,37 +40,33 @@ public class ContainsFunction extends ScalarFunction {
 
     @Override
     public boolean evaluate(Tuple tuple, ImmutableBytesWritable ptr) {
-        Expression oneParam = children.get(0);
-        if (!oneParam.evaluate(tuple, ptr))
-            return false;
-        Geometry geoOne = null;
-        try {
-            geoOne = new WKTReader().read((String) PVarchar.INSTANCE.toObject(ptr, oneParam.getDataType()));
-        } catch (ParseException e) {
-            e.printStackTrace();
+        List<String> params = new ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+            Expression param = children.get(i);
+            if (!param.evaluate(tuple, ptr))
+                return false;
+            params.add((String) PVarchar.INSTANCE.toObject(ptr, param.getDataType()));
         }
 
-        Expression twoParam = children.get(1);
-        if (!twoParam.evaluate(tuple, ptr))
-            return false;
-        Geometry geoTwo = null;
+        Geometry geoOne, geoTwo;
         try {
-            geoTwo = new WKTReader().read((String) PVarchar.INSTANCE.toObject(ptr, twoParam.getDataType()));
+            geoOne = new WKTReader().read(params.get(0));
+            geoTwo = new WKTReader().read(params.get(1));
         } catch (ParseException e) {
-            e.printStackTrace();
+            throw new IllegalDataException("parse geometry-wkt exception");
         }
 
         if (geoOne != null && geoTwo != null) {
-            Boolean result = geoOne.contains(geoTwo);
-            ptr.set(getDataType().toBytes(result));
+            getDataType().getCodec().encodeInt(geoOne.contains(geoTwo) ? 1 : 0, ptr);
         } else {
             throw new IllegalDataException("parse geometry-wkt exception");
         }
         return true;
     }
 
-    @Override
+    @SuppressWarnings("rawtypes")
+	@Override
     public PDataType getDataType() {
-        return PBoolean.INSTANCE;
+        return PInteger.INSTANCE;
     }
 }
