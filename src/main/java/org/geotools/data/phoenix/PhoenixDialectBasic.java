@@ -5,8 +5,10 @@ import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKBReader;
+import com.vividsolutions.jts.io.WKTWriter;
 import org.geotools.data.jdbc.FilterToSQL;
 import org.geotools.jdbc.BasicSQLDialect;
+import org.geotools.jdbc.Index;
 import org.geotools.jdbc.JDBCDataStore;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
@@ -63,6 +65,11 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     }
 
     @Override
+    public void registerSqlTypeNameToClassMappings(Map<String, Class<?>> mappings) {
+        delegate.registerSqlTypeNameToClassMappings(mappings);
+    }
+
+    @Override
     public void encodePostCreateTable(String tableName, StringBuffer sql) {
         delegate.encodePostCreateTable(tableName, sql);
     }
@@ -75,6 +82,11 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     @Override
     public void postCreateTable(String schemaName, SimpleFeatureType featureType, Connection cx) throws SQLException, IOException {
         delegate.postCreateTable(schemaName, featureType, cx);
+    }
+
+    @Override
+    public Class<?> getMapping(ResultSet columnMetaData, Connection cx) throws SQLException {
+        return delegate.getMapping(columnMetaData, cx);
     }
 
     @Override
@@ -95,6 +107,16 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     @Override
     public Integer getGeometrySRID(String schemaName, String tableName, String columnName, Connection cx) throws SQLException {
         return delegate.getGeometrySRID(schemaName, tableName, columnName, cx);
+    }
+
+    @Override
+    public int getGeometryDimension(String schemaName, String tableName, String columnName, Connection cx) throws SQLException {
+        return delegate.getGeometryDimension(schemaName, tableName, columnName, cx);
+    }
+
+    @Override
+    public String getGeometryTypeName(Integer type) {
+        return delegate.getGeometryTypeName(type);
     }
 
     @Override
@@ -158,7 +180,7 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     }
 
     /**
-     * 编码几何图形值的时候调用
+     * 利用WKB将几何对象存储为数据库中的VARBINARY
      * @param value
      * @param dimension
      * @param srid
@@ -168,14 +190,14 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     @Override
     public void encodeGeometryValue(Geometry value, int dimension, int srid, StringBuffer sql) throws IOException {
         if (value != null && !value.isEmpty()) {
-
+            sql.append("'").append(new WKTWriter().write(value)).append("'");
         } else {
             sql.append("NULL");
         }
     }
 
     /**
-     * 解码几何图形值的时候调用
+     * 将数据库中存储的几何对象的二进制数据读取为集合对象时调用
      * @param descriptor
      * @param rs
      * @param column
@@ -216,5 +238,20 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     @Override
     public Envelope decodeGeometryEnvelope(ResultSet rs, int column, Connection cx) throws SQLException, IOException {
         return delegate.decodeGeometryEnvelope(rs, column, cx);
+    }
+
+    @Override
+    public boolean isAutoCommitQuery() {
+        return delegate.isAutoCommitQuery();
+    }
+
+    @Override
+    public void createIndex(Connection cx, SimpleFeatureType schema, String databaseSchema, Index index) throws SQLException {
+        delegate.createIndex(cx, schema, databaseSchema, index);
+    }
+
+    @Override
+    public void dropIndex(Connection cx, SimpleFeatureType schema, String databaseSchema, String indexName) throws SQLException {
+        delegate.dropIndex(cx, schema, databaseSchema, indexName);
     }
 }
