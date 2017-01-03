@@ -20,6 +20,7 @@ import java.io.IOException;
 public class PhoenixFilterToSQL extends FilterToSQL {
     /**
      * 添加Phoenix所支持的空间函数
+     *
      * @return
      */
     @Override
@@ -45,7 +46,7 @@ public class PhoenixFilterToSQL extends FilterToSQL {
         Geometry g = (Geometry) evaluateLiteral(expression, Geometry.class);
         if (g instanceof LinearRing)
             g = g.getFactory().createLineString(((LinearRing) g).getCoordinateSequence());
-        out.write("ST_GEOFROMTEXT('" + g.toText() + "', " + currentSRID + ")");
+        out.write("'" + g.toText() + "'");
     }
 
     @Override
