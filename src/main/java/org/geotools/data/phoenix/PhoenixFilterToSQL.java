@@ -2,6 +2,7 @@ package org.geotools.data.phoenix;
 
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.LinearRing;
+import org.apache.phoenix.schema.IllegalDataException;
 import org.geotools.data.jdbc.FilterToSQL;
 import org.geotools.filter.FilterCapabilities;
 import org.opengis.filter.expression.Expression;
@@ -10,8 +11,6 @@ import org.opengis.filter.expression.PropertyName;
 import org.opengis.filter.spatial.*;
 
 import java.io.IOException;
-
-import static org.geotools.filter.FilterCapabilities.SIMPLE_COMPARISONS_OPENGIS;
 
 /**
  * 文件描述：Phoenix specific filter encoder.
@@ -67,7 +66,7 @@ public class PhoenixFilterToSQL extends FilterToSQL {
                 e1.accept(this, extraData);
                 out.write(",");
                 e2.accept(this, extraData);
-                out.write(")");
+                out.write(") = 1");
 
                 if (!(filter instanceof BBOX))
                     out.write(" AND ");
@@ -84,7 +83,7 @@ public class PhoenixFilterToSQL extends FilterToSQL {
                 } else if (filter instanceof Beyond) {
                     out.write("'>', '");
                 } else {
-                    throw new RuntimeException("Unknown distance operator");
+                    throw new IllegalDataException("Unknown distance compare operator");
                 }
                 out.write(Double.toString(((DistanceBufferOperator) filter).getDistance()));
                 out.write("') = 1");

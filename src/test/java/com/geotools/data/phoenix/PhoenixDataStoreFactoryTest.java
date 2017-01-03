@@ -35,10 +35,7 @@ import org.opengis.filter.expression.Expression;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 文件描述：Phoenix数据库的简单测试类
@@ -201,8 +198,17 @@ public class PhoenixDataStoreFactoryTest {
         jdbcDataStore.dropIndex("GEOTOOLS_CM", "GEOHASH_IDX");
     }
 
+    /**
+     * 测试将GEOHASH值转为坐标值的算法
+     */
+    @Test
+    public void testGeohashToCoordinate() {
+        double[] coordinate = GeoHashConverter.geohashToLongAndLati(-4604394606633189360L);
+        System.out.println(Arrays.toString(coordinate));
+    }
+
     public static void main(String[] args) throws IOException {
         PhoenixDataStoreFactoryTest test = new PhoenixDataStoreFactoryTest();
-        test.testAddFeatures();
+        test.testGeohashToCoordinate();
     }
 }
