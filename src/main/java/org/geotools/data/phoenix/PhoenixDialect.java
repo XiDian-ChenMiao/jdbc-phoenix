@@ -85,6 +85,14 @@ public class PhoenixDialect extends SQLDialect {
         }
     };
     /**
+     * 定义空间类型在创建新列时列名的后缀名映射
+     */
+    protected final static Map<String, String> TYPE_TO_SUFFIX_MAP = new HashMap<String, String>() {
+        {
+            put("POINT", "_GEOHASH");
+        }
+    };
+    /**
      * 默认的创建索引的后缀名
      */
     private static String INDEX_SUFFIX = "_idx";
@@ -425,9 +433,7 @@ public class PhoenixDialect extends SQLDialect {
                 continue;
 
             GeometryDescriptor gd = (GeometryDescriptor) attributeDescriptor;
-            if (!attributeDescriptor.isNillable()) {
-                createGeometryIndex(schemaName, featureType, cx, gd);
-            }
+            createColumnAndIndexFromGeometryType(schemaName, featureType, cx, gd);/*根据用户自定义的列的类型来判断是否添加新列用来创建索引而加速查询*/
 
             CoordinateReferenceSystem crs = gd.getCoordinateReferenceSystem();
             int srid = -1;
@@ -462,23 +468,53 @@ public class PhoenixDialect extends SQLDialect {
     }
 
     /**
-     * 关于空间列创建索引
+     * 根据空间类型添加索引列以及在其上创建合适的索引
+     * （1）如果是POINT类型的列，则新创建一个新的GEOHASH列并在其上添加索引；
      * @param schemaName
      * @param featureType
      * @param cx
      * @param gd
      * @throws SQLException
      */
-    private void createGeometryIndex(String schemaName, SimpleFeatureType featureType, Connection cx, GeometryDescriptor gd) throws SQLException {
+    private void createColumnAndIndexFromGeometryType(String schemaName, SimpleFeatureType featureType, Connection cx, GeometryDescriptor gd) throws SQLException {
+        GeometryType type = gd.getType();
+        if (type != null) {
+            if (Point.class.equals(type.getBinding())) {
+                StringBuffer sql = new StringBuffer("ALTER TABLE");
+                sql.append(schemaName == null ? "" : schemaName + ".");
+                encodeTableName(featureType.getTypeName(), sql);
+                sql.append("ADD IF NOT EXISTS ");
+                encodeColumnName(null, gd.getLocalName() + TYPE_TO_SUFFIX_MAP.get("POINT"), sql);
+                sql.append(" BIGINT NOT NULL");
+                LOGGER.fine(sql.toString());
+                Statement statement = cx.createStatement();
+                try {
+                    statement.execute(sql.toString());
+                    createIndexOnNewColumn(schemaName, featureType.getTypeName(), cx, gd.getLocalName() + TYPE_TO_SUFFIX_MAP.get("POINT"));
+                } finally {
+                    dataStore.closeSafe(statement);
+                }
+            }
+        }
+    }
+
+    /**
+     * 在新创建的列上添加索引
+     * @param schemaName
+     * @param tableName
+     * @param cx
+     * @param columnName
+     * @throws SQLException
+     */
+    private void createIndexOnNewColumn(String schemaName, String tableName, Connection cx, String columnName) throws SQLException {
         StringBuffer sql = new StringBuffer("CREATE INDEX ");
-        encodeColumnName(null, gd.getLocalName() + INDEX_SUFFIX, sql);
+        encodeColumnName(null, columnName + INDEX_SUFFIX, sql);
         sql.append(" ON ");
         sql.append(schemaName == null ? "" : schemaName + ".");
-        encodeTableName(featureType.getTypeName(), sql);
+        encodeTableName(tableName, sql);
         sql.append("(");
-        encodeColumnName(null, gd.getLocalName(), sql);
+        encodeColumnName(null, columnName, sql);
         sql.append(")");
-
         LOGGER.fine(sql.toString());
         Statement statement = cx.createStatement();
         try {
@@ -487,7 +523,6 @@ public class PhoenixDialect extends SQLDialect {
             dataStore.closeSafe(statement);
         }
     }
-
     /**
      * 从元数据表中获取空间参考ID
      * @param schemaName The database schema, could be <code>null</code>.

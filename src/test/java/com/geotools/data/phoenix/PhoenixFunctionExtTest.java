@@ -285,7 +285,7 @@ public class PhoenixFunctionExtTest {
         try {
             connection = getConnection();
             statement = connection.createStatement();
-            result = statement.executeQuery("SELECT ST_EQUALS(GEOMETRY, 'POINT (2 2)') FROM GEOTOOLS_CM");
+            result = statement.executeQuery("SELECT * FROM GEOTOOLS_CM WHERE 1 = ST_EQUALS(GEOMETRY, 'POINT (2 2)')");
             while (result.next()) {
                 System.out.println(result.getObject(1));
             }
@@ -323,5 +323,6 @@ public class PhoenixFunctionExtTest {
     public static void main(String[] args) throws IOException, FilterToSQLException, CQLException {
         PhoenixFunctionExtTest test = new PhoenixFunctionExtTest();
         test.testUseEqualsFunction();
+        test.testUseDistanceFunction();
     }
 }

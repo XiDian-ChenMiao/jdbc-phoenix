@@ -6,8 +6,8 @@ import com.vividsolutions.jts.io.WKTReader;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.phoenix.expression.Expression;
 import org.apache.phoenix.expression.function.ScalarFunction;
-import org.apache.phoenix.parse.FunctionParseNode;
 import org.apache.phoenix.schema.IllegalDataException;
+import org.apache.phoenix.schema.SortOrder;
 import org.apache.phoenix.schema.tuple.Tuple;
 import org.apache.phoenix.schema.types.PDataType;
 import org.apache.phoenix.schema.types.PInteger;
@@ -20,7 +20,6 @@ import java.util.List;
  * ST_EQUALS函数
  * Created by Administrator on 2016/12/22.
  */
-@FunctionParseNode.BuiltInFunction(name = EqualsFunction.NAME, args = {@FunctionParseNode.Argument(allowedTypes = {PVarchar.class, PVarchar.class})})
 public class EqualsFunction extends ScalarFunction {
 
     protected final static String NAME = "ST_EQUALS";
@@ -68,5 +67,10 @@ public class EqualsFunction extends ScalarFunction {
 	@Override
     public PDataType getDataType() {
         return PInteger.INSTANCE;
+    }
+
+    @Override
+    public SortOrder getSortOrder() {
+        return getChildren().get(0).getSortOrder();
     }
 }
