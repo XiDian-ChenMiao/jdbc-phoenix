@@ -19,9 +19,7 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.io.IOException;
 import java.sql.*;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.logging.Level;
 
 /**
@@ -90,6 +88,21 @@ public class PhoenixDialect extends SQLDialect {
     protected final static Map<String, String> TYPE_TO_SUFFIX_MAP = new HashMap<String, String>() {
         {
             put("POINT", "_GEOHASH");
+        }
+    };
+    /**
+     * 根绝空间类型字符串替换为VARCHAR的类型列表
+     */
+    protected final static List<String> TYPE_TO_VARCHAR = new ArrayList<String>() {
+        {
+            add("POINT");
+            add("LINESTRING");
+            add("POLYGON");
+            add("MULTIPOINT");
+            add("MULTILINESTRING");
+            add("MULTIPOLYGON");
+            add("GEOMETRY");
+            add("GEOMETRYCOLLETION");
         }
     };
     /**
@@ -213,6 +226,20 @@ public class PhoenixDialect extends SQLDialect {
     @Override
     public void encodeGeometryEnvelope(String tableName, String geometryColumn, StringBuffer sql) {
         encodeColumnName(null, geometryColumn, sql);
+    }
+
+    /**
+     * 在此将所有类型名称为空间类型替换为字符串类型
+     * @param sqlTypeName
+     * @param sql
+     */
+    @Override
+    public void encodeColumnType(String sqlTypeName, StringBuffer sql) {
+        if (TYPE_TO_VARCHAR.contains(sqlTypeName)) {
+            sql.append("VARCHAR(255)");
+        } else {
+            super.encodeColumnType(sqlTypeName, sql);
+        }
     }
 
     /**
@@ -352,32 +379,12 @@ public class PhoenixDialect extends SQLDialect {
     @Override
     public void encodePrimaryKey(String column, StringBuffer sql) {
         encodeColumnName(null, column, sql);
-        sql.append(" INTEGER PRIMARY KEY DESC");
+        sql.append(" INTEGER NOT NULL PRIMARY KEY DESC");
     }
 
     @Override
     public boolean lookupGeneratedValuesPostInsert() {
         return true;
-    }
-
-    /**
-     * 在创建表中列之后执行的函数
-     * @param att The attribute corresponding to the column.
-     * @param sql
-     */
-    @Override
-    public void encodePostColumnCreateTable(AttributeDescriptor att, StringBuffer sql) {
-        super.encodePostColumnCreateTable(att, sql);
-        /*将凡是空间类型修饰的属性统一处理为VARCHAR*/
-        if (att instanceof GeometryDescriptor) {
-            int lastBracketIndex = sql.lastIndexOf(" ");/*最后一个空格的位置*/
-            sql.setLength(lastBracketIndex + 1);
-            sql.append("VARCHAR(255)");
-        }
-        /*使几何列非空，目的在于其上建立索引*/
-        if (att instanceof GeometryDescriptor && !att.isNillable()) {
-            sql.append(" NOT NULL");
-        }
     }
 
     /**
@@ -433,7 +440,8 @@ public class PhoenixDialect extends SQLDialect {
                 continue;
 
             GeometryDescriptor gd = (GeometryDescriptor) attributeDescriptor;
-            createColumnAndIndexFromGeometryType(schemaName, featureType, cx, gd);/*根据用户自定义的列的类型来判断是否添加新列用来创建索引而加速查询*/
+            if (!gd.isNillable())
+                createColumnAndIndexFromGeometryType(schemaName, featureType, cx, gd);/*根据用户自定义的列的类型来判断是否添加新列用来创建索引而加速查询*/
 
             CoordinateReferenceSystem crs = gd.getCoordinateReferenceSystem();
             int srid = -1;
@@ -480,12 +488,12 @@ public class PhoenixDialect extends SQLDialect {
         GeometryType type = gd.getType();
         if (type != null) {
             if (Point.class.equals(type.getBinding())) {
-                StringBuffer sql = new StringBuffer("ALTER TABLE");
+                StringBuffer sql = new StringBuffer("ALTER TABLE ");
                 sql.append(schemaName == null ? "" : schemaName + ".");
                 encodeTableName(featureType.getTypeName(), sql);
-                sql.append("ADD IF NOT EXISTS ");
+                sql.append(" ADD IF NOT EXISTS ");
                 encodeColumnName(null, gd.getLocalName() + TYPE_TO_SUFFIX_MAP.get("POINT"), sql);
-                sql.append(" BIGINT NOT NULL");
+                sql.append(" BIGINT NOT NULL ");
                 LOGGER.fine(sql.toString());
                 Statement statement = cx.createStatement();
                 try {
@@ -523,6 +531,7 @@ public class PhoenixDialect extends SQLDialect {
             dataStore.closeSafe(statement);
         }
     }
+
     /**
      * 从元数据表中获取空间参考ID
      * @param schemaName The database schema, could be <code>null</code>.
