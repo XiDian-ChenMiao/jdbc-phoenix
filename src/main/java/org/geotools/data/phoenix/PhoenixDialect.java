@@ -19,9 +19,7 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.io.IOException;
 import java.sql.*;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.logging.Level;
 
 /**
@@ -85,6 +83,39 @@ public class PhoenixDialect extends SQLDialect {
         }
     };
     /**
+     * 定义空间类型在创建新列时列名的后缀名映射
+     */
+    protected final static Map<Class, String> TYPE_TO_SUFFIX_MAP = new HashMap<Class, String>() {
+        {
+            put(Point.class, "_GEOHASH");
+            // TODO: 2017/1/5 在此需要考虑其他类型对应新列的后缀名
+        }
+    };
+    /**
+     * 创建表中空间列的映射关系，其中键指的是列名，值指的是其类型字符串
+     */
+    private Map<String, String> geo_column_map;
+    /**
+     * 根绝空间类型字符串替换为VARCHAR的类型列表
+     */
+    protected final static List<String> TYPE_TO_VARCHAR = new ArrayList<String>() {
+        {
+            add("POINT");
+            add("LINESTRING");
+            add("POLYGON");
+            add("MULTIPOINT");
+            add("MULTILINESTRING");
+            add("MULTIPOLYGON");
+            add("GEOMETRY");
+            add("GEOMETRYCOLLETION");
+        }
+    };
+    /**
+     * 由于Phoenix对于非空属性的语法限制，这里采取添加约束的方式来添加主键，并且将空间属性也纳入到主键属性中
+     */
+    private List<String> pk_column_names;
+
+    /**
      * 默认的创建索引的后缀名
      */
     private static String INDEX_SUFFIX = "_idx";
@@ -96,6 +127,8 @@ public class PhoenixDialect extends SQLDialect {
     protected PhoenixDialect(JDBCDataStore dataStore) {
         super(dataStore);
         isImmutableRows = true;/*默认设置为只能一次插入多次读取*/
+        pk_column_names = new ArrayList<>();
+        geo_column_map = new HashMap<>();
     }
 
     public void setImmutableRows(boolean immutableRows) {
@@ -145,14 +178,36 @@ public class PhoenixDialect extends SQLDialect {
     }
 
     /**
+     * 根据创建表中是否有空间列决定是否添加用于帮助创建索引的列
+     * @param sql
+     */
+    private void encodeCreateHashColumn(StringBuffer sql) {
+        if (geo_column_map != null && geo_column_map.size() != 0) {
+            for (Map.Entry<String, String> entry : geo_column_map.entrySet()) {
+                if ("POINT".equals(entry.getValue())) {/*如果是点，则新建列的后缀名为_GEOHASH*/
+                    sql.append(", ").append(entry.getKey() + TYPE_TO_SUFFIX_MAP.get(Point.class)).append(" BIGINT NOT NULL");/*新建列类型为BIGINT*/
+                    pk_column_names.add(entry.getKey() + TYPE_TO_SUFFIX_MAP.get(Point.class));/*并将其加入到主键属性中*/
+                }
+                // TODO: 2017/1/5 在此需要考虑其他类型对应是否添加新列
+            }
+        }
+    }
+
+    /**
      * 建表之后的表选项参数设置
      * @param tableName
      * @param sql
      */
     @Override
     public void encodePostCreateTable(String tableName, StringBuffer sql) {
+        sql.setLength(sql.length() - 2);/*删除掉空格和右括号*/
+        encodeCreateHashColumn(sql);
+        sql.append(", CONSTRAINT " + tableName + "_PK ");
+        sql.append("PRIMARY KEY ( ");
+        sql.append(String.join(", ", pk_column_names));
+        sql.append(" ))");/*添加上右括号*/
         if (isImmutableRows) {
-            sql.append("IMMUTABLE_ROWS = true");
+            sql.append(" IMMUTABLE_ROWS = true");
         }
     }
 
@@ -205,6 +260,24 @@ public class PhoenixDialect extends SQLDialect {
     @Override
     public void encodeGeometryEnvelope(String tableName, String geometryColumn, StringBuffer sql) {
         encodeColumnName(null, geometryColumn, sql);
+    }
+
+    /**
+     * 在此将所有类型名称为空间类型替换为字符串类型
+     * @param sqlTypeName
+     * @param sql
+     */
+    @Override
+    public void encodeColumnType(String sqlTypeName, StringBuffer sql) {
+        if (TYPE_TO_VARCHAR.contains(sqlTypeName)) {
+            sql.setLength(sql.length() - 1);/*去掉最后一个空格*/
+            String geoColumnName = sql.toString().substring(sql.lastIndexOf(" ") + 1);/*空间列名*/
+            geo_column_map.put(geoColumnName, sqlTypeName);/*将空间列的列名与其类型的对应关系加入到映射中*/
+            pk_column_names.add(geoColumnName);/*将空间列也纳入到主键属性中*/
+            sql.append(" VARCHAR(255)");
+        } else {
+            super.encodeColumnType(sqlTypeName, sql);
+        }
     }
 
     /**
@@ -344,32 +417,13 @@ public class PhoenixDialect extends SQLDialect {
     @Override
     public void encodePrimaryKey(String column, StringBuffer sql) {
         encodeColumnName(null, column, sql);
-        sql.append(" INTEGER PRIMARY KEY DESC");
+        sql.append(" INTEGER NOT NULL");/*这里先不声明此列为主键列，而是在其后添加主键约束*/
+        pk_column_names.add(column);/*记录主键属性*/
     }
 
     @Override
     public boolean lookupGeneratedValuesPostInsert() {
         return true;
-    }
-
-    /**
-     * 在创建表中列之后执行的函数
-     * @param att The attribute corresponding to the column.
-     * @param sql
-     */
-    @Override
-    public void encodePostColumnCreateTable(AttributeDescriptor att, StringBuffer sql) {
-        super.encodePostColumnCreateTable(att, sql);
-        /*将凡是空间类型修饰的属性统一处理为VARCHAR*/
-        if (att instanceof GeometryDescriptor) {
-            int lastBracketIndex = sql.lastIndexOf(" ");/*最后一个空格的位置*/
-            sql.setLength(lastBracketIndex + 1);
-            sql.append("VARCHAR(255)");
-        }
-        /*使几何列非空，目的在于其上建立索引*/
-        if (att instanceof GeometryDescriptor && !att.isNillable()) {
-            sql.append(" NOT NULL");
-        }
     }
 
     /**
@@ -425,9 +479,8 @@ public class PhoenixDialect extends SQLDialect {
                 continue;
 
             GeometryDescriptor gd = (GeometryDescriptor) attributeDescriptor;
-            if (!attributeDescriptor.isNillable()) {
-                createGeometryIndex(schemaName, featureType, cx, gd);
-            }
+            if (!gd.isNillable())
+                createIndexOnNewCreateColumn(schemaName, featureType, cx, gd);
 
             CoordinateReferenceSystem crs = gd.getCoordinateReferenceSystem();
             int srid = -1;
@@ -462,30 +515,16 @@ public class PhoenixDialect extends SQLDialect {
     }
 
     /**
-     * 关于空间列创建索引
+     * 在新增加的列上创建合适的索引
      * @param schemaName
      * @param featureType
      * @param cx
      * @param gd
-     * @throws SQLException
      */
-    private void createGeometryIndex(String schemaName, SimpleFeatureType featureType, Connection cx, GeometryDescriptor gd) throws SQLException {
-        StringBuffer sql = new StringBuffer("CREATE INDEX ");
-        encodeColumnName(null, gd.getLocalName() + INDEX_SUFFIX, sql);
-        sql.append(" ON ");
-        sql.append(schemaName == null ? "" : schemaName + ".");
-        encodeTableName(featureType.getTypeName(), sql);
-        sql.append("(");
-        encodeColumnName(null, gd.getLocalName(), sql);
-        sql.append(")");
-
-        LOGGER.fine(sql.toString());
-        Statement statement = cx.createStatement();
-        try {
-            statement.execute(sql.toString());
-        } finally {
-            dataStore.closeSafe(statement);
-        }
+    private void createIndexOnNewCreateColumn(String schemaName, SimpleFeatureType featureType, Connection cx, GeometryDescriptor gd) throws SQLException {
+        String columnName = gd.getLocalName() + TYPE_TO_SUFFIX_MAP.get(gd.getType().getBinding());
+        Index index = new Index(featureType.getTypeName(), columnName + INDEX_SUFFIX, true, columnName);
+        createIndex(cx, featureType, schemaName, index);
     }
 
     /**
@@ -764,15 +803,14 @@ public class PhoenixDialect extends SQLDialect {
         sql.setLength(sql.length() - 2);
         sql.append(")");
 
-        Statement st;
+        Statement st = cx.createStatement();
         try {
-            st = cx.createStatement();
             st.execute(sql.toString());
             if (!cx.getAutoCommit()) {
                 cx.commit();
             }
         } finally {
-            dataStore.closeSafe(cx);
+            dataStore.closeSafe(st);
         }
     }
 }

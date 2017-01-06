@@ -16,17 +16,25 @@ import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.data.simple.SimpleFeatureStore;
 import org.geotools.factory.CommonFactoryFinder;
+import org.geotools.feature.AttributeImpl;
+import org.geotools.feature.NameImpl;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
+import org.geotools.feature.type.AttributeDescriptorImpl;
+import org.geotools.feature.type.AttributeTypeImpl;
+import org.geotools.feature.type.GeometryDescriptorImpl;
+import org.geotools.feature.type.GeometryTypeImpl;
 import org.geotools.filter.text.cql2.CQL;
 import org.geotools.filter.text.cql2.CQLException;
 import org.geotools.jdbc.Index;
 import org.geotools.jdbc.JDBCDataStore;
 import org.geotools.jdbc.PrimaryKeyFinder;
 import org.junit.Test;
+import org.opengis.feature.Attribute;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.*;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory;
 import org.opengis.filter.PropertyIsEqualTo;
@@ -35,10 +43,7 @@ import org.opengis.filter.expression.Expression;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 文件描述：Phoenix数据库的简单测试类
@@ -95,7 +100,7 @@ public class PhoenixDataStoreFactoryTest {
         PhoenixDataStoreFactory factory = new PhoenixDataStoreFactory();
         DataStore dataStore = factory.createDataStore(params);
         JDBCDataStore jdbcDataStore = (JDBCDataStore) dataStore;
-        SimpleFeatureSource simpleFeaturerSource = jdbcDataStore.getFeatureSource("GEOTOOLS_CM");
+        SimpleFeatureSource simpleFeaturerSource = jdbcDataStore.getFeatureSource("geotools_cm");
 
         Transaction transaction = new DefaultTransaction();
         SimpleFeatureStore simpleFeatureStore = (SimpleFeatureStore) simpleFeaturerSource;
@@ -107,8 +112,8 @@ public class PhoenixDataStoreFactoryTest {
 
         GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
-        infos.add(builder.buildFeature("3", new Object[]{geometryFactory.createPoint(new Coordinate(3, 3)), 3, "3", GeoHashConverter.longAndLatiToGeohash(3, 3)}));
-        infos.add(builder.buildFeature("4", new Object[]{geometryFactory.createPoint(new Coordinate(4, 4)), 4, "4", GeoHashConverter.longAndLatiToGeohash(4, 4)}));
+        infos.add(builder.buildFeature("3", new Object[]{geometryFactory.createPoint(new Coordinate(3, 3)), 3, "3"}));
+        infos.add(builder.buildFeature("4", new Object[]{geometryFactory.createPoint(new Coordinate(4, 4)), 4, "4"}));
 
         SimpleFeatureCollection collection = new ListFeatureCollection(schema, infos);
 
@@ -127,7 +132,7 @@ public class PhoenixDataStoreFactoryTest {
     @Test
     public void testSearch() throws IOException, CQLException {
         DataStore dataStore = DataStoreFinder.getDataStore(params);
-        SimpleFeatureSource featureSource = dataStore.getFeatureSource("GEOTOOLS_CM");
+        SimpleFeatureSource featureSource = dataStore.getFeatureSource("geotools_cm");
         Filter filter = CQL.toFilter("INTPROPERTY = 1");
 
         SimpleFeatureCollection features = featureSource.getFeatures(filter);
@@ -152,7 +157,7 @@ public class PhoenixDataStoreFactoryTest {
     @Test
     public void testQueryByProperty() throws Exception {
         JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
-        SimpleFeatureType type = jdbcDataStore.getSchema("GEOTOOLS_CM");
+        SimpleFeatureType type = jdbcDataStore.getSchema("geotools_cm");
         FilterFactory filterFactory = CommonFactoryFinder.getFilterFactory(null);
         Expression literal = filterFactory.literal(1);
         Expression prop = filterFactory.property("INTPROPERRTY");
@@ -161,7 +166,7 @@ public class PhoenixDataStoreFactoryTest {
         FilterToSQL filterToSQL = new FilterToSQL(buffer);
         filterToSQL.setFeatureType(type);
         filterToSQL.encode(filter);
-        Query query = new Query("GEOTOOLS_CM", filter);
+        Query query = new Query("geotools_cm", filter);
         FeatureReader<SimpleFeatureType, SimpleFeature> reader = jdbcDataStore.getFeatureReader(query, Transaction.AUTO_COMMIT);
         if (reader != null) {
             while (reader.hasNext()) {
@@ -177,11 +182,14 @@ public class PhoenixDataStoreFactoryTest {
     @Test
     public void testCreateTable() throws IOException {
         SimpleFeatureTypeBuilder typeBuilder = new SimpleFeatureTypeBuilder();
-        typeBuilder.add("geometry", Point.class, 4326);
+        GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
+        GeometryType geo_attr = new GeometryTypeImpl(new NameImpl("geometry"), Point.class, null, false, false, Collections.EMPTY_LIST, null, null);
+        GeometryDescriptor geo_desc = new GeometryDescriptorImpl(geo_attr, new NameImpl("geometry"), 0, 2, false, geometryFactory.createPoint(new Coordinate(0, 0)));
+
+        typeBuilder.add(geo_desc);
         typeBuilder.add("intProperty", Integer.class);
         typeBuilder.add("stringProperty", String.class);
-        typeBuilder.add("geohash", Long.class);
-        typeBuilder.setName("GEOTOOLS_CM");
+        typeBuilder.setName("geotools_cm");
 
         SimpleFeatureType simpleFeatureType = typeBuilder.buildFeatureType();
         JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
@@ -191,18 +199,27 @@ public class PhoenixDataStoreFactoryTest {
     @Test
     public void testCreateIndex() throws IOException {
         JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
-        Index geoHashIndex = new Index("GEOTOOLS_CM", "GEOHASH_IDX", false, "geohash");
+        Index geoHashIndex = new Index("geotools_cm", "GEOHASH_IDX", false, "geohash");
         jdbcDataStore.createIndex(geoHashIndex);
     }
 
     @Test
     public void testDropIndex() throws IOException {
         JDBCDataStore jdbcDataStore = (JDBCDataStore) DataStoreFinder.getDataStore(params);
-        jdbcDataStore.dropIndex("GEOTOOLS_CM", "GEOHASH_IDX");
+        jdbcDataStore.dropIndex("geotools_cm", "GEOHASH_IDX");
+    }
+
+    /**
+     * 测试将GEOHASH值转为坐标值的算法
+     */
+    @Test
+    public void testGeohashToCoordinate() {
+        double[] coordinate = GeoHashConverter.geohashToLongAndLati(-4604394606633189360L);
+        System.out.println(Arrays.toString(coordinate));
     }
 
     public static void main(String[] args) throws IOException {
         PhoenixDataStoreFactoryTest test = new PhoenixDataStoreFactoryTest();
-        test.testAddFeatures();
+        test.testCreateTable();
     }
 }

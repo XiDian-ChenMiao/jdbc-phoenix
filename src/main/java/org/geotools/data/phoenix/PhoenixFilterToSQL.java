@@ -2,6 +2,7 @@ package org.geotools.data.phoenix;
 
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.LinearRing;
+import org.apache.phoenix.schema.IllegalDataException;
 import org.geotools.data.jdbc.FilterToSQL;
 import org.geotools.filter.FilterCapabilities;
 import org.opengis.filter.expression.Expression;
@@ -11,8 +12,6 @@ import org.opengis.filter.spatial.*;
 
 import java.io.IOException;
 
-import static org.geotools.filter.FilterCapabilities.SIMPLE_COMPARISONS_OPENGIS;
-
 /**
  * 文件描述：Phoenix specific filter encoder.
  * 创建作者：陈苗
@@ -21,6 +20,7 @@ import static org.geotools.filter.FilterCapabilities.SIMPLE_COMPARISONS_OPENGIS;
 public class PhoenixFilterToSQL extends FilterToSQL {
     /**
      * 添加Phoenix所支持的空间函数
+     *
      * @return
      */
     @Override
@@ -46,7 +46,7 @@ public class PhoenixFilterToSQL extends FilterToSQL {
         Geometry g = (Geometry) evaluateLiteral(expression, Geometry.class);
         if (g instanceof LinearRing)
             g = g.getFactory().createLineString(((LinearRing) g).getCoordinateSequence());
-        out.write("ST_GEOFROMTEXT('" + g.toText() + "', " + currentSRID + ")");
+        out.write("'" + g.toText() + "'");
     }
 
     @Override
@@ -67,7 +67,7 @@ public class PhoenixFilterToSQL extends FilterToSQL {
                 e1.accept(this, extraData);
                 out.write(",");
                 e2.accept(this, extraData);
-                out.write(")");
+                out.write(") = 1");
 
                 if (!(filter instanceof BBOX))
                     out.write(" AND ");
@@ -84,7 +84,7 @@ public class PhoenixFilterToSQL extends FilterToSQL {
                 } else if (filter instanceof Beyond) {
                     out.write("'>', '");
                 } else {
-                    throw new RuntimeException("Unknown distance operator");
+                    throw new IllegalDataException("Unknown distance compare operator");
                 }
                 out.write(Double.toString(((DistanceBufferOperator) filter).getDistance()));
                 out.write("') = 1");
@@ -126,4 +126,5 @@ public class PhoenixFilterToSQL extends FilterToSQL {
         }
         return extraData;
     }
+
 }

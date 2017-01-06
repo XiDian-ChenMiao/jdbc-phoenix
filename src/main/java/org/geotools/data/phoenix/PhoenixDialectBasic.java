@@ -60,11 +60,6 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     }
 
     @Override
-    public void encodePostColumnCreateTable(AttributeDescriptor att, StringBuffer sql) {
-        delegate.encodePostColumnCreateTable(att, sql);
-    }
-
-    @Override
     public void registerSqlTypeNameToClassMappings(Map<String, Class<?>> mappings) {
         delegate.registerSqlTypeNameToClassMappings(mappings);
     }
@@ -82,6 +77,11 @@ public class PhoenixDialectBasic extends BasicSQLDialect {
     @Override
     public void postCreateTable(String schemaName, SimpleFeatureType featureType, Connection cx) throws SQLException, IOException {
         delegate.postCreateTable(schemaName, featureType, cx);
+    }
+
+    @Override
+    public void encodeColumnType(String sqlTypeName, StringBuffer sql) {
+        delegate.encodeColumnType(sqlTypeName, sql);
     }
 
     @Override
