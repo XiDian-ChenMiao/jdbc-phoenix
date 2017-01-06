@@ -85,9 +85,9 @@ public class PhoenixDialect extends SQLDialect {
     /**
      * 定义空间类型在创建新列时列名的后缀名映射
      */
-    protected final static Map<String, String> TYPE_TO_SUFFIX_MAP = new HashMap<String, String>() {
+    protected final static Map<Class, String> TYPE_TO_SUFFIX_MAP = new HashMap<Class, String>() {
         {
-            put("POINT", "_GEOHASH");
+            put(Point.class, "_GEOHASH");
             // TODO: 2017/1/5 在此需要考虑其他类型对应新列的后缀名
         }
     };
@@ -185,8 +185,8 @@ public class PhoenixDialect extends SQLDialect {
         if (geo_column_map != null && geo_column_map.size() != 0) {
             for (Map.Entry<String, String> entry : geo_column_map.entrySet()) {
                 if ("POINT".equals(entry.getValue())) {/*如果是点，则新建列的后缀名为_GEOHASH*/
-                    sql.append(", ").append(entry.getKey() + TYPE_TO_SUFFIX_MAP.get("POINT")).append(" BIGINT NOT NULL");/*新建列类型为BIGINT*/
-                    pk_column_names.add(entry.getKey() + TYPE_TO_SUFFIX_MAP.get("POINT"));/*并将其加入到主键属性中*/
+                    sql.append(", ").append(entry.getKey() + TYPE_TO_SUFFIX_MAP.get(Point.class)).append(" BIGINT NOT NULL");/*新建列类型为BIGINT*/
+                    pk_column_names.add(entry.getKey() + TYPE_TO_SUFFIX_MAP.get(Point.class));/*并将其加入到主键属性中*/
                 }
                 // TODO: 2017/1/5 在此需要考虑其他类型对应是否添加新列
             }
@@ -200,12 +200,12 @@ public class PhoenixDialect extends SQLDialect {
      */
     @Override
     public void encodePostCreateTable(String tableName, StringBuffer sql) {
-        sql.setLength(sql.length() - 1);/*删除掉右括号*/
+        sql.setLength(sql.length() - 2);/*删除掉空格和右括号*/
         encodeCreateHashColumn(sql);
         sql.append(", CONSTRAINT " + tableName + "_PK ");
-        sql.append("PRIMARY KEY (");
+        sql.append("PRIMARY KEY ( ");
         sql.append(String.join(", ", pk_column_names));
-        sql.append("))");/*添加上右括号*/
+        sql.append(" ))");/*添加上右括号*/
         if (isImmutableRows) {
             sql.append(" IMMUTABLE_ROWS = true");
         }
@@ -522,7 +522,7 @@ public class PhoenixDialect extends SQLDialect {
      * @param gd
      */
     private void createIndexOnNewCreateColumn(String schemaName, SimpleFeatureType featureType, Connection cx, GeometryDescriptor gd) throws SQLException {
-        String columnName = gd.getLocalName() + TYPE_TO_SUFFIX_MAP.get(gd.getType().getBinding().getSimpleName());
+        String columnName = gd.getLocalName() + TYPE_TO_SUFFIX_MAP.get(gd.getType().getBinding());
         Index index = new Index(featureType.getTypeName(), columnName + INDEX_SUFFIX, true, columnName);
         createIndex(cx, featureType, schemaName, index);
     }
@@ -803,15 +803,14 @@ public class PhoenixDialect extends SQLDialect {
         sql.setLength(sql.length() - 2);
         sql.append(")");
 
-        Statement st;
+        Statement st = cx.createStatement();
         try {
-            st = cx.createStatement();
             st.execute(sql.toString());
             if (!cx.getAutoCommit()) {
                 cx.commit();
             }
         } finally {
-            dataStore.closeSafe(cx);
+            dataStore.closeSafe(st);
         }
     }
 }
