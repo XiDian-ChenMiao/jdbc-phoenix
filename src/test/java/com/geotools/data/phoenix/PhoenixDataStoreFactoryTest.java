@@ -182,11 +182,7 @@ public class PhoenixDataStoreFactoryTest {
     @Test
     public void testCreateTable() throws IOException {
         SimpleFeatureTypeBuilder typeBuilder = new SimpleFeatureTypeBuilder();
-        GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
-        GeometryType geo_attr = new GeometryTypeImpl(new NameImpl("geometry"), Point.class, null, false, false, Collections.EMPTY_LIST, null, null);
-        GeometryDescriptor geo_desc = new GeometryDescriptorImpl(geo_attr, new NameImpl("geometry"), 0, 2, false, geometryFactory.createPoint(new Coordinate(0, 0)));
-
-        typeBuilder.add(geo_desc);
+        typeBuilder.add("geometry", Point.class);
         typeBuilder.add("intProperty", Integer.class);
         typeBuilder.add("stringProperty", String.class);
         typeBuilder.setName("geotools_cm");

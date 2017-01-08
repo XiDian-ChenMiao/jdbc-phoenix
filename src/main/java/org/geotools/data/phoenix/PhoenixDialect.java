@@ -87,7 +87,7 @@ public class PhoenixDialect extends SQLDialect {
      */
     protected final static Map<Class, String> TYPE_TO_SUFFIX_MAP = new HashMap<Class, String>() {
         {
-            put(Point.class, "_GEOHASH");
+            put(Point.class, "_geohash");
             // TODO: 2017/1/5 在此需要考虑其他类型对应新列的后缀名
         }
     };
@@ -110,10 +110,6 @@ public class PhoenixDialect extends SQLDialect {
             add("GEOMETRYCOLLETION");
         }
     };
-    /**
-     * 由于Phoenix对于非空属性的语法限制，这里采取添加约束的方式来添加主键，并且将空间属性也纳入到主键属性中
-     */
-    private List<String> pk_column_names;
 
     /**
      * 默认的创建索引的后缀名
@@ -127,7 +123,6 @@ public class PhoenixDialect extends SQLDialect {
     protected PhoenixDialect(JDBCDataStore dataStore) {
         super(dataStore);
         isImmutableRows = true;/*默认设置为只能一次插入多次读取*/
-        pk_column_names = new ArrayList<>();
         geo_column_map = new HashMap<>();
     }
 
@@ -185,8 +180,7 @@ public class PhoenixDialect extends SQLDialect {
         if (geo_column_map != null && geo_column_map.size() != 0) {
             for (Map.Entry<String, String> entry : geo_column_map.entrySet()) {
                 if ("POINT".equals(entry.getValue())) {/*如果是点，则新建列的后缀名为_GEOHASH*/
-                    sql.append(", ").append(entry.getKey() + TYPE_TO_SUFFIX_MAP.get(Point.class)).append(" BIGINT NOT NULL");/*新建列类型为BIGINT*/
-                    pk_column_names.add(entry.getKey() + TYPE_TO_SUFFIX_MAP.get(Point.class));/*并将其加入到主键属性中*/
+                    sql.append(", ").append(entry.getKey() + TYPE_TO_SUFFIX_MAP.get(Point.class)).append(" BIGINT");/*新建列类型为BIGINT*/
                 }
                 // TODO: 2017/1/5 在此需要考虑其他类型对应是否添加新列
             }
@@ -201,11 +195,8 @@ public class PhoenixDialect extends SQLDialect {
     @Override
     public void encodePostCreateTable(String tableName, StringBuffer sql) {
         sql.setLength(sql.length() - 2);/*删除掉空格和右括号*/
-        encodeCreateHashColumn(sql);
-        sql.append(", CONSTRAINT " + tableName + "_PK ");
-        sql.append("PRIMARY KEY ( ");
-        sql.append(String.join(", ", pk_column_names));
-        sql.append(" ))");/*添加上右括号*/
+        encodeCreateHashColumn(sql);/*根据所建列的类型决定是否添加新的辅助列*/
+        sql.append(" )");/*添加上右括号*/
         if (isImmutableRows) {
             sql.append(" IMMUTABLE_ROWS = true");
         }
@@ -273,7 +264,6 @@ public class PhoenixDialect extends SQLDialect {
             sql.setLength(sql.length() - 1);/*去掉最后一个空格*/
             String geoColumnName = sql.toString().substring(sql.lastIndexOf(" ") + 1);/*空间列名*/
             geo_column_map.put(geoColumnName, sqlTypeName);/*将空间列的列名与其类型的对应关系加入到映射中*/
-            pk_column_names.add(geoColumnName);/*将空间列也纳入到主键属性中*/
             sql.append(" VARCHAR(255)");
         } else {
             super.encodeColumnType(sqlTypeName, sql);
@@ -391,11 +381,11 @@ public class PhoenixDialect extends SQLDialect {
         ResultSet result = null;
         try {
             StringBuffer sql = new StringBuffer();
-            sql.append("SELECT type FROM ").append(gTableName.toUpperCase()).append(" WHERE 1 = 1 ");
+            sql.append("SELECT type FROM ").append(gTableName).append(" WHERE 1 = 1 ");
             if (schemaName != null && !"".equals(schemaName))
-                sql.append("AND f_table_schema = '").append(schemaName.toUpperCase()).append("' ");
-            sql.append("AND f_table_name = '").append(tableName.toUpperCase()).append("' ");
-            sql.append("AND ").append(gColumnName).append(" = '").append(columnName.toUpperCase()).append("'");
+                sql.append("AND f_table_schema = '").append(schemaName).append("' ");
+            sql.append("AND f_table_name = '").append(tableName).append("' ");
+            sql.append("AND ").append(gColumnName).append(" = '").append(columnName).append("'");
             LOGGER.log(Level.FINE, "Geometry type check; {0}", sql);
             statement = cx.createStatement();
             result = statement.executeQuery(sql.toString());
@@ -417,8 +407,7 @@ public class PhoenixDialect extends SQLDialect {
     @Override
     public void encodePrimaryKey(String column, StringBuffer sql) {
         encodeColumnName(null, column, sql);
-        sql.append(" INTEGER NOT NULL");/*这里先不声明此列为主键列，而是在其后添加主键约束*/
-        pk_column_names.add(column);/*记录主键属性*/
+        sql.append(" INTEGER NOT NULL PRIMARY KEY");
     }
 
     @Override
@@ -479,8 +468,7 @@ public class PhoenixDialect extends SQLDialect {
                 continue;
 
             GeometryDescriptor gd = (GeometryDescriptor) attributeDescriptor;
-            if (!gd.isNillable())
-                createIndexOnNewCreateColumn(schemaName, featureType, cx, gd);
+            createIndexOnNewCreateColumn(schemaName, featureType, cx, gd);
 
             CoordinateReferenceSystem crs = gd.getCoordinateReferenceSystem();
             int srid = -1;
@@ -497,13 +485,13 @@ public class PhoenixDialect extends SQLDialect {
             StringBuffer sql = new StringBuffer("UPSERT INTO ");
             encodeTableName("geometry_columns", sql);
             sql.append(" VALUES (").append("'").append(UUID.randomUUID().toString().replace("-", "")).append("', ");
-            sql.append(schemaName != null ? "'" + schemaName.toUpperCase() + "'" : "NULL").append(", ");
-            sql.append("'").append(featureType.getTypeName().toUpperCase()).append("', ");
-            sql.append("'").append(attributeDescriptor.getLocalName().toUpperCase()).append("', ");
+            sql.append(schemaName != null ? "'" + schemaName + "'" : "NULL").append(", ");
+            sql.append("'").append(featureType.getTypeName()).append("', ");
+            sql.append("'").append(attributeDescriptor.getLocalName()).append("', ");
             sql.append("2, ");
             sql.append(srid).append(", ");
             Geometries g = Geometries.getForBinding((Class<? extends Geometry>) gd.getType().getBinding());
-            sql.append("'").append(g != null ? g.getName().toUpperCase() : "GEOMETRY").append("')");
+            sql.append("'").append(g != null ? g.getName() : "GEOMETRY").append("')");
             LOGGER.fine(sql.toString());
             Statement st = cx.createStatement();
             try {
