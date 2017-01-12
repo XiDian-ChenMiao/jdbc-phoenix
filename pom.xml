@@ -63,7 +63,6 @@
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>4.12</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.phoenix</groupId>
@@ -76,6 +75,11 @@
             <groupId>org.geotools</groupId>
             <artifactId>gt-cql</artifactId>
             <version>RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-main</artifactId>
+            <version>17-SNAPSHOT</version>
         </dependency>
     </dependencies>
 </project>

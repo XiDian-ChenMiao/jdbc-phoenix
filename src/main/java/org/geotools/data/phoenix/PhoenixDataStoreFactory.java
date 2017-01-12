@@ -40,10 +40,6 @@ public class PhoenixDataStoreFactory extends JDBCDataStoreFactory {
      * 密码
      */
     public static final Param PASSWD = new Param("passwd", String.class, new SimpleInternationalString("password used to login"), false, null, Collections.singletonMap(Parameter.IS_PASSWORD, Boolean.TRUE));
-    /**
-     * 暴露主键
-     */
-    public static final Param EXPOSE_PK = new Param("Expose primary keys", Boolean.class, "Expose primary key columns as attributes of the feature type", false, false);
 
     @Override
     public String getDisplayName() {
