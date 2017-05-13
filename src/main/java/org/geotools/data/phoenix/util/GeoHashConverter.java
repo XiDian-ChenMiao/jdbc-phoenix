@@ -30,7 +30,7 @@ public class GeoHashConverter {
     }
 
     /**
-     * 函数功能：double类型的经纬度坐标转long类型的GeoHash，经测试，转码正确，但long的编码二进制是64位，本函数由张洋提供
+     * 函数功能：double类型的经纬度坐标转long类型的GeoHash，经测试，转码正确，但long的编码二进制是64位
      *
      * @param longitude 经度
      * @param latitude  纬度
@@ -68,7 +68,7 @@ public class GeoHashConverter {
     }
 
     /**
-     * 函数功能：long类型的GeoHash值转double类型的经纬度坐标，由张洋提供，经测试，转码正确
+     * 函数功能：long类型的GeoHash值转double类型的经纬度坐标
      *
      * @param geoHash long类型的geoHash值
      * @return doule类型的经纬度坐标
