@@ -52,7 +52,7 @@
             <email>daqinzhidi@163.com</email>
             <organization>XiDian University</organization>
             <roles>
-                <role>Module Maintainer</role>
+                <role>Module Designer And Maintainer</role>
                 <role>Java Developer</role>
             </roles>
         </developer>
@@ -60,22 +60,11 @@
 
     <dependencies>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.12</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.apache.phoenix</groupId>
             <artifactId>phoenix-client</artifactId>
             <version>4.4.0</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/lib/phoenix-4.4.0-HBase-0.98-client.jar</systemPath>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-cql</artifactId>
-            <version>RELEASE</version>
+            <systemPath>${project.basedir}/lib/phoenix-4.4.0-hbase-0.98-client.jar</systemPath>
         </dependency>
     </dependencies>
 </project>
